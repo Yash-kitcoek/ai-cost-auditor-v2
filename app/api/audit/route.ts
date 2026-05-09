@@ -5,7 +5,6 @@ import { saveAudit } from '@/lib/db/supabase';
 import { AuditInput } from '@/lib/audit/types';
 import { nanoid } from 'nanoid';
 
-// Simple in-memory rate limiter (per IP, 10 audits/hour)
 const rateLimitMap = new Map<string, { count: number; resetAt: number }>();
 
 function isRateLimited(ip: string): boolean {
@@ -21,14 +20,9 @@ function isRateLimited(ip: string): boolean {
 }
 
 export async function POST(req: NextRequest) {
-  const ip =
-    req.headers.get('x-forwarded-for')?.split(',')[0]?.trim() || 'unknown';
-
+  const ip = req.headers.get('x-forwarded-for')?.split(',')[0]?.trim() || 'unknown';
   if (isRateLimited(ip)) {
-    return NextResponse.json(
-      { error: 'Too many requests. Please try again later.' },
-      { status: 429 }
-    );
+    return NextResponse.json({ error: 'Too many requests.' }, { status: 429 });
   }
 
   let body: { input: AuditInput; honeypot?: string };
@@ -38,40 +32,19 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Invalid JSON' }, { status: 400 });
   }
 
-  // Honeypot check
   if (body.honeypot) {
     return NextResponse.json({ error: 'Bot detected' }, { status: 400 });
   }
 
-  const { input } = body;
-
-  if (!input || !Array.isArray(input.tools) || input.tools.length === 0) {
-    return NextResponse.json(
-      { error: 'At least one tool is required.' },
-      { status: 400 }
-    );
+  if (!body.input?.tools?.length) {
+    return NextResponse.json({ error: 'Add at least one tool.' }, { status: 400 });
   }
 
-  if (input.tools.length > 20) {
-    return NextResponse.json({ error: 'Too many tools.' }, { status: 400 });
-  }
+  const result = runAudit(body.input);
+  result.summary = await generateAISummary(result);
 
-  // Run audit (pure sync logic)
-  const result = runAudit(input);
-
-  // Generate AI summary (with fallback)
-  const summary = await generateAISummary(result);
-  result.summary = summary;
-
-  // Persist audit
   const id = nanoid(10);
-  const savedAudit = {
-    id,
-    input,
-    result,
-    createdAt: new Date().toISOString(),
-  };
-  await saveAudit(savedAudit);
+  await saveAudit({ id, input: body.input, result, createdAt: new Date().toISOString() });
 
   return NextResponse.json({ id, result });
 }

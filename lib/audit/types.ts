@@ -13,7 +13,7 @@ export type ToolId =
 export interface ToolEntry {
   toolId: ToolId;
   plan: string;
-  monthlySpend: number; // user-entered or auto-filled from pricing
+  monthlySpend: number;
   seats: number;
 }
 
@@ -43,8 +43,8 @@ export interface AuditResult {
   totalCurrentSpend: number;
   totalOptimizedSpend: number;
   isAlreadyOptimal: boolean;
-  highSavings: boolean; // >$500/mo
-  summary?: string; // AI-generated
+  highSavings: boolean;
+  summary?: string;
   useCase: UseCase;
   teamSize: number;
 }
