@@ -1,53 +1,55 @@
 # Landing Copy
 
-## Hero Headline
-Stop overpaying for AI tools. Find out in 60 seconds.
+## Hero headline (≤10 words)
 
-## Subheadline
-Free instant audit of your team's AI subscriptions — Cursor, Claude, ChatGPT and more. 
-See exactly where you're overspending and how to fix it.
+**Are you overpaying for AI tools?**
+
+---
+
+## Subheadline (≤25 words)
+
+Enter your subscriptions. Get an instant audit showing where you're overspending and exactly how much you could save.
+
+---
 
 ## Primary CTA
-Run My Free Audit →
 
-## Social Proof Block
-*(Mocked — for illustrative purposes)*
+**Run my free audit →**
 
-> "Found $340/month in savings in under a minute. Switched our team off Cursor Business 
-> and cancelled the redundant ChatGPT Team plan the same day."
-> — Engineering Manager, 12-person SaaS startup
+(No signup. Takes 60 seconds.)
 
-> "Finally a tool that gives me a number I can bring to the team instead of a vague 
-> feeling we're overpaying."
-> — Head of Finance, Series A startup
+---
 
-> "Didn't know Cursor Hobby was free until this tool flagged it. Cancelled Copilot 
-> Individual immediately."
-> — Solo developer, indie hacker
+## Social proof block
 
-**Stats (mocked):**
-- 2,400+ audits run
-- Average savings found: $180/month
-- Takes 60 seconds
+_Mocked — indicated clearly. Replace with real data after launch._
+
+> "Saved us $340/month in 5 minutes. Turns out we had GitHub Copilot and Cursor running in parallel for the whole team."
+> — **S.R., CTO, 15-person startup** _(mocked)_
+
+> "I finally had something to show the CFO. The audit gave me the numbers I needed to cut our AI bill by 28%."
+> — **A.M., Engineering Lead** _(mocked)_
+
+**Numbers** _(mocked — replace with real aggregate data after 100 audits)_
+- Average savings found per audit: **$287/month**
+- Audits completed: **1,240**
+- Most common overspend: GitHub Copilot Enterprise for teams under 10
+
+---
 
 ## FAQ
 
 **Q: Is this actually free?**
-A: Yes. No credit card, no account, no catch. We show you value first — always.
+Yes. No credit card, no trial period, no hidden upsell. The tool is free because it's built and maintained by [Credex](https://credex.rocks), who can help you act on the savings if you find significant ones.
 
-**Q: How accurate is the pricing data?**
-A: Every price is verified weekly against official vendor pricing pages. 
-Sources are cited in full at the bottom of every audit report.
+**Q: What data do you collect?**
+The tools and plans you enter, your team size, and your use case. We don't require your company name or email to run an audit. Email is optional — only requested after you see your results, never before.
 
-**Q: Do you store my data?**
-A: The audit result is stored with a unique ID to power the shareable URL. 
-Your email is only collected if you choose to receive the report — never before.
+**Q: How do you know the pricing is accurate?**
+Every price in the audit engine traces to an official vendor pricing page, verified at the time of submission. Pricing changes — we update the data regularly. The source URLs are published in our [PRICING_DATA.md](./PRICING_DATA.md).
 
-**Q: What tools do you cover?**
-A: Cursor, GitHub Copilot, Claude, ChatGPT, Anthropic API, OpenAI API, 
-Gemini, and Windsurf — with more being added weekly.
+**Q: What is Credex and why are they offering this for free?**
+Credex sells discounted AI infrastructure credits — Cursor, Claude, ChatGPT Enterprise, and others — sourced from companies that overforecast. The audit tool helps identify where you're overspending. For significant savings, Credex is often the fastest way to act on those findings. The tool is genuinely useful whether or not you use Credex.
 
-**Q: What is Credex?**
-A: Credex sources discounted AI infrastructure credits from companies that 
-overforecast or pivoted. For teams with significant overspend, a Credex 
-consultant can often find an additional 15–30% on top of what this tool identifies.
+**Q: Can I share my audit results?**
+Yes. Each audit gets a unique public URL. Your email and company name are stripped from the public version — only tools, plans, and savings numbers are shown. Designed to be shared with your team or CFO.

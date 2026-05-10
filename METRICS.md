@@ -1,50 +1,45 @@
 # Metrics
 
-## North Star Metric
-**Qualified leads generated per week** — defined as email captures from audits 
-showing >$100/month in savings.
+## North Star metric
 
-This is the right North Star because the tool exists to generate leads for Credex. 
-DAU is wrong (people use this once, not daily). Total audits is vanity without 
-qualification. A qualified lead is someone who has already seen their savings number 
-and chosen to share their email — the highest-intent signal available.
+**Audits completed per week.**
 
-## 3 Input Metrics That Drive the North Star
+Not visitors (too many don't convert to audits — low signal). Not email captures (a lagging metric — it only goes up after value is proven). Not revenue (too indirect for a free lead-gen tool at this stage). Audits completed is the moment value is delivered. If audits per week is growing, everything downstream — email captures, Credex consultations, credit purchases — grows with it.
 
-**1. Audit completion rate** (visitors → audit submitted)
-Target: >30%. Currently tracking via: audit POST requests / page loads.
-If this drops below 20%, the form is too complex or the value prop isn't clear enough 
-on the landing page.
+---
 
-**2. Email capture rate** (audits completed → email submitted)
-Target: >15% overall, >35% for audits showing >$500/mo savings.
-This is split because high-savings users have much stronger motivation to capture 
-the report. If overall capture rate is low but high-savings capture is strong, the 
-issue is the low-savings flow, not the product.
+## Three input metrics that drive the North Star
 
-**3. Savings-found rate** (audits with >$0 savings / total audits)
-Target: >60% of audits should surface at least some savings.
-If this is too low, the audit engine rules need expanding. If too high (>90%), 
-we may be manufacturing savings — which destroys trust and word-of-mouth.
+**1. Landing page → audit start rate** (target: >35%)
+The share of visitors who add at least one tool to the form. If this is low, the headline or the form is wrong — visitors aren't understanding or trusting the value proposition fast enough. Instrumented as: `addTool` event fired ÷ page views.
 
-## What to Instrument First
+**2. Audit start → completion rate** (target: >75%)
+The share of users who start the form and actually hit "Run Audit." Drop-off here means the form is too long, confusing, or the plan dropdowns are frustrating. Instrumented as: `auditSubmitted` event ÷ `addTool` events.
 
-1. `audit_completed` event — fired when POST /api/audit returns 200. 
-   Properties: total_spend, savings_found, tools_count, use_case, team_size.
-2. `email_captured` event — fired on successful POST /api/email. 
-   Properties: audit_id, savings_amount, is_high_savings.
-3. `result_shared` event — fired when "Copy Link" is clicked. 
-   Properties: audit_id, savings_amount.
+**3. Time to first audit** (target: <90 seconds)
+If it takes more than 90 seconds to go from landing to seeing results, we're losing people who came on impulse (an HN comment, a tweet, a colleague's Slack message). Instrumented as: median time between `pageView` and `auditResultShown` events.
 
-These three events give you the full funnel: landing → audit → capture → viral loop.
+---
 
-## Pivot Trigger
+## What I'd instrument first
 
-If after 500 audits, email capture rate is below 8% AND average savings found 
-is below $50/audit, the product has a product-market fit problem, not a distribution 
-problem. At that point, pivot the audit engine to focus on API cost optimization 
-(token usage analysis) rather than subscription plan comparison — that's where 
-the real money is for technical teams.
+In order of priority:
+1. `page_view` with referrer (so we know which channels are working)
+2. `tool_added` (which tool, which plan — tells us what the typical stack looks like)
+3. `audit_submitted` (form completion)
+4. `audit_result_shown` (including `totalMonthlySavings` — tells us what savings the engine is finding)
+5. `email_captured` (with `monthlySavings` to understand the high-value segment)
+6. `credex_cta_clicked` (the commercial event)
 
-The number: **8% capture rate on 500 audits = 40 leads**. 
-If we can't get 40 leads from 500 audits, the value proposition isn't landing.
+All of these can be done with Plausible (privacy-first, no cookie banner needed) or PostHog (free tier, good funnel views).
+
+---
+
+## The number that triggers a pivot
+
+If the **audit → email capture rate drops below 10%** after 500 audits, the tool is not showing compelling enough value to earn the email address. This means either:
+- The savings numbers are too small to be motivating (the engine is too conservative)
+- The result page isn't making the savings feel real (design/copy problem)
+- The wrong people are using the tool (distribution problem — wrong channels)
+
+At 10% capture rate, the entire lead-gen funnel needs 2× the traffic to produce the same output. Paid acquisition becomes necessary and unit economics break. The pivot decision: rebuild the engine to be more aggressive with recommendations, or pivot the tool to a different audience where savings are larger (e.g., target enterprise teams where the savings per audit are 10× larger).
