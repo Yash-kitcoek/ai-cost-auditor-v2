@@ -1,93 +1,97 @@
 // app/result/[id]/layout.tsx
-// Dynamic metadata for each audit result URL
-// This makes every shared link show the actual savings amount in the preview
+// SERVER COMPONENT — can export generateMetadata (unlike page.tsx which is 'use client')
+// Fetches real savings amount from Supabase to build dynamic OG + Twitter tags.
 
 import { Metadata } from 'next';
+import { getAudit } from '@/lib/db/supabase';
 
-const BASE_URL =
-  process.env.NEXT_PUBLIC_BASE_URL || 'https://aicostaudit.com';
+interface Props {
+  params: { id: string };
+  children: React.ReactNode;
+}
 
-async function getAuditMeta(id: string) {
+export async function generateMetadata({ params }: Props): Promise<Metadata> {
+  const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'https://aicostaudit.com';
+  const auditUrl = `${baseUrl}/result/${params.id}`;
+  const ogImage = `${baseUrl}/og-image.png`;
+
+  // Fetch real audit data server-side for dynamic metadata
+  // Falls back to generic metadata if DB is offline or audit not found
   try {
-    const res = await fetch(`${BASE_URL}/api/audit/${id}`, {
-      next: { revalidate: 3600 }, // Cache for 1 hour
-    });
-    if (!res.ok) return null;
-    return await res.json();
+    const audit = await getAudit(params.id);
+    const savings = audit?.result?.totalMonthlySavings ?? 0;
+    const annual = audit?.result?.totalAnnualSavings ?? savings * 12;
+    const isOptimal = audit?.result?.isAlreadyOptimal ?? false;
+
+    // Dynamic title + description based on actual savings
+    const title = isOptimal
+      ? 'AI Spend Audit — Stack already optimised'
+      : savings >= 500
+      ? `AI Spend Audit — $${savings.toLocaleString()}/mo in savings found`
+      : savings > 0
+      ? `AI Spend Audit — $${savings}/mo in potential savings`
+      : 'AI Spend Audit Report';
+
+    const description = isOptimal
+      ? 'This team\'s AI stack is well-optimised. Run your own free audit in 60 seconds.'
+      : savings > 0
+      ? `We found $${savings}/month ($${annual.toLocaleString()}/year) in AI tool overspend. See the full breakdown and check your own stack free.`
+      : 'Free instant audit of AI tool spend. Find overspending in 60 seconds — no login required.';
+
+    // Dynamic share text for Twitter (shown in tweet when link is pasted)
+    const twitterTitle = isOptimal
+      ? 'AI Spend Audit — Well optimised stack'
+      : savings > 500
+      ? `🚨 $${savings.toLocaleString()}/month in wasted AI spend found`
+      : savings > 0
+      ? `Found $${savings}/month in AI tool overspend`
+      : 'AI Spend Audit';
+
+    const twitterDescription = isOptimal
+      ? 'Stack is optimised. Check yours free →'
+      : `Save $${savings}/month — see full breakdown and audit your own stack free.`;
+
+    return {
+      title,
+      description,
+      openGraph: {
+        title,
+        description,
+        url: auditUrl,
+        type: 'website',
+        siteName: 'AI Spend Audit',
+        images: [{ url: ogImage, width: 1200, height: 630, alt: title }],
+      },
+      twitter: {
+        card: 'summary_large_image',
+        title: twitterTitle,
+        description: twitterDescription,
+        images: [ogImage],
+      },
+    };
   } catch {
-    return null;
+    // DB offline or audit not found — return safe generic metadata
+    return {
+      title: 'AI Spend Audit Report',
+      description: 'Free instant audit of AI tool spend. Find overspending in 60 seconds.',
+      openGraph: {
+        title: 'AI Spend Audit — Are you overpaying for AI tools?',
+        description: 'Free instant audit. Find overspending in 60 seconds — no login required.',
+        url: auditUrl,
+        type: 'website',
+        siteName: 'AI Spend Audit',
+        images: [{ url: ogImage, width: 1200, height: 630 }],
+      },
+      twitter: {
+        card: 'summary_large_image',
+        title: 'AI Spend Audit',
+        description: 'Find out if you\'re overpaying for AI tools. Free, 60 seconds, no login.',
+        images: [ogImage],
+      },
+    };
   }
 }
 
-export async function generateMetadata({
-  params,
-}: {
-  params: { id: string };
-}): Promise<Metadata> {
-  const data = await getAuditMeta(params.id);
-  const result = data?.result;
-
-  const savings = result?.totalMonthlySavings ?? 0;
-  const annual = result?.totalAnnualSavings ?? 0;
-  const isOptimal = result?.isAlreadyOptimal ?? false;
-  const teamSize = result?.teamSize ?? 1;
-  const useCase = result?.useCase ?? 'mixed';
-  const toolCount = result?.recommendations?.length ?? 0;
-
-  // Dynamic title based on audit result
-  const title = isOptimal
-    ? `AI Spend Audit — Stack is well optimized`
-    : savings > 0
-    ? `AI Spend Audit — $${savings.toLocaleString()}/mo in savings found`
-    : 'AI Spend Audit Report';
-
-  // Dynamic description
-  const description = isOptimal
-    ? `${teamSize}-person ${useCase} team — ${toolCount} tools audited. No major overspend detected.`
-    : `${teamSize}-person ${useCase} team spending $${savings.toLocaleString()}/mo more than needed. $${annual.toLocaleString()}/year in potential savings identified across ${toolCount} AI tools.`;
-
-  const pageUrl = `${BASE_URL}/result/${params.id}`;
-  // Use the dynamic OG image generated by opengraph-image.tsx
-  const ogImageUrl = `${pageUrl}/opengraph-image`;
-
-  return {
-    title,
-    description,
-    openGraph: {
-      title,
-      description,
-      url: pageUrl,
-      type: 'website',
-      siteName: 'AI Cost Audit',
-      images: [
-        {
-          url: ogImageUrl,
-          width: 1200,
-          height: 630,
-          alt: isOptimal
-            ? 'AI Spend Audit — Well Optimized'
-            : `AI Spend Audit — ${savings.toLocaleString()}/mo in savings found`,
-        },
-      ],
-    },
-    twitter: {
-      card: 'summary_large_image',
-      title,
-      description,
-      images: [ogImageUrl],
-      creator: '@credex',
-    },
-    // Canonical URL — important for SEO
-    alternates: {
-      canonical: pageUrl,
-    },
-  };
-}
-
-export default function ResultLayout({
-  children,
-}: {
-  children: React.ReactNode;
-}) {
+export default function ResultLayout({ children }: Props) {
   return <>{children}</>;
 }
