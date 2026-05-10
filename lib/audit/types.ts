@@ -44,6 +44,7 @@ export interface AuditResult {
   totalOptimizedSpend: number;
   isAlreadyOptimal: boolean;
   highSavings: boolean;
+  score: number;          
   summary?: string;
   useCase: UseCase;
   teamSize: number;
