@@ -25,7 +25,7 @@ export const metadata: Metadata = {
     title: 'AI Cost Audit — Stop overpaying for AI tools',
     description: 'Free instant AI spend audit. See exactly where your money is going.',
     type: 'website',
-    images: ['/og-image.png'],
+    images: ['/og-image.svg'],
   },
 
   twitter: {

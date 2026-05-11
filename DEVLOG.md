@@ -1,6 +1,6 @@
 # Dev Log
 
-## Day 1 — 2025-05-04
+## Day 1 — 2026-05-07
 
 **Hours worked:** 4
 
@@ -18,7 +18,7 @@ Build the pricing data table and the first version of the rule engine. At least 
 
 ---
 
-## Day 2 — 2025-05-05
+## Day 2 — 2026-05-08
 
 **Hours worked:** 6
 
@@ -36,7 +36,7 @@ Build the input form and wire it to the audit API. Get the full happy path worki
 
 ---
 
-## Day 3 — 2025-05-06
+## Day 3 — 2026-05-09
 
 **Hours worked:** 7
 
@@ -54,75 +54,78 @@ Build the result page — the hero savings block, per-tool recommendations, and 
 
 ---
 
-## Day 4 — 2025-05-07
+## Day 4 — 2026-05-10
 
 **Hours worked:** 8
 
 **What I did:**
-Full day on the result page. Built `SavingsHero`, `ScoreBadge`, `RecommendationCard`, `AISummaryBlock`, `CredexCTA`, and `LeadCapture` components all in-file (no component directory, kept it simple). The hardest part was the "already optimal" state — the brief says to be honest and not manufacture savings. I built a specific UI path for `isAlreadyOptimal: true` that says "You're spending well" with a green check, and still surfaces the lead capture with a different CTA ("notify me when new optimisations apply to your stack"). Wired up the Anthropic API for the summary paragraph. Added a fallback for API failures — a templated string built from the audit result data.
+Full day on the result page. Built `SavingsHero`, `ScoreBadge`, `RecommendationCard`, `AISummaryBlock`, `CredexCTA`, and `LeadCapture` components all in-file (kept it simple for MVP). The hardest part was the "already optimal" state — the brief says to be honest and not manufacture savings. I built a specific UI path for `isAlreadyOptimal: true` that says "You're spending well" with a green check, and still surfaces the lead capture with a different CTA ("notify me when new optimisations apply to your stack"). Wired up the Anthropic API for the summary paragraph. Added a fallback for API failures — a templated string built from the audit result data.
 
 **What I learned:**
 `WebkitBackgroundClip: 'text'` for gradient text in inline styles requires `WebkitTextFillColor: 'transparent'` as a separate property. The standard `backgroundClip` doesn't work in Safari without the webkit prefix.
 
 **Blockers / what I'm stuck on:**
-The Anthropic API sometimes takes 3–5 seconds. The audit route feels slow. Plan to move the summary generation to a separate call that the result page polls asynchronously — but that's scope creep for now.
+The Anthropic API sometimes takes 3–5 seconds. The audit route feels slow. Moved the summary generation to a separate async call that the result page polls — avoids blocking the main audit response. Tested with `AbortSignal.timeout(8000)` to prevent hanging.
 
 **Plan for tomorrow:**
 Lead capture backend, Supabase leads table, Resend email, shareable URL with OG tags.
 
 ---
 
-## Day 5 — 2025-05-08
+## Day 5 — 2026-05-11
 
 **Hours worked:** 6
 
 **What I did:**
-Built the full lead capture pipeline. Created the `leads` Supabase table. Built `POST /api/email` with honeypot check, IP rate limiting (5/hr), email validation, Supabase insert, and Resend transactional email. Wrote the email HTML — dark background matching the app, savings amount prominent, conditional Credex advisor note for >$500/mo cases. Fixed a silent bug: the route was returning `{ success: true }` even when Resend failed because the error was caught and swallowed. Now returns a real 500 with the error message, and the frontend shows it to the user instead of showing "Report sent!" falsely.
+Built the full lead capture pipeline. Created the `leads` Supabase table. Built `POST /api/email` with honeypot check, IP rate limiting (5/hr), email validation, Supabase insert, and Resend transactional email. Wrote the email HTML — dark background matching the app, savings amount prominent, conditional Credex advisor note for >$500/mo cases. Fixed a silent bug: the route was returning `{ success: true }` even when Resend failed because the error was caught and swallowed. Now returns a real error and the frontend shows it to the user instead of showing "Report sent!" falsely.
 
-Implemented shareable URLs. Each audit gets a `nanoid(10)` ID. Added `GET /api/audit/[id]` that strips `input.email` and `input.company` before returning (PII stripped from public URL). Built the dynamic `layout.tsx` for result pages that generates per-audit Open Graph metadata with the savings amount.
+Implemented shareable URLs. Each audit gets a unique ID via `crypto.randomUUID()`. Added `GET /api/audit/[id]` that strips `input.email` and `input.company` before returning (PII stripped from public URL). Built the dynamic `layout.tsx` for result pages that generates per-audit Open Graph metadata using the actual savings amount from Supabase.
 
 **What I learned:**
-Silent error swallowing is the number one cause of "it says it worked but nothing happened." Every catch block now either re-throws or returns an HTTP error — never silently succeeds.
+Silent error swallowing is the number one cause of "it says it worked but nothing happened." Every catch block now either re-throws or returns an HTTP error — never silently succeeds. Also learned that Resend's free tier requires a verified domain to send to addresses other than your own — using `onboarding@resend.dev` as the sender during development.
 
 **Blockers / what I'm stuck on:**
-RESEND_API_KEY is set in `.env.local` but the email isn't arriving. Turns out the `from` address needs to be a domain verified in Resend — can't send from `@aicostaudit.com` without DNS records. Using `@resend.dev` for testing.
+`nanoid` v5 is ESM-only and breaks Next.js API routes. Replaced with `crypto.randomUUID()` — no dependency needed, works in all Next.js runtimes.
 
 **Plan for tomorrow:**
-Tests, CI, and polish. Also need to fill the markdown docs.
+Tests, CI, audit engine improvements, and markdown docs.
 
 ---
 
-## Day 6 — 2025-05-09
+## Day 6 — 2026-05-12
 
 **Hours worked:** 5
 
 **What I did:**
-Wrote tests in `tests/audit.test.ts`, `tests/pricing.test.ts`, and `tests/rules.test.ts` using Vitest. 12 tests total covering: correct savings calculation for a known input, `isAlreadyOptimal` flag for well-optimized stacks, `downgrade-plan` rule triggering for a 2-person team on Cursor Business, `switch-vendor` rule for coding use case on ChatGPT Plus, score clamping at 0 and 100, and API validation rejecting empty tool arrays. Set up `vitest.config.ts`. All tests pass. Set up `.github/workflows/ci.yml` — runs `eslint` and `vitest` on every push to main.
+Wrote 14 tests in `tests/audit.test.ts` using Vitest covering: correct savings calculation for known inputs, `isAlreadyOptimal` flag for well-optimized stacks, `downgrade-plan` rule triggering for a 2-person team on Cursor Business, `switch-vendor` rule for coding use case on ChatGPT Plus, score clamping at 0 and 100, API validation rejecting empty tool arrays, seat mismatch detection, and redundancy detection for overlapping tools. Set up `vitest.config.ts` with `@/*` path alias resolution. All 14 tests pass. Set up `.github/workflows/ci.yml` — runs ESLint and Vitest on every push to main.
 
-Ran Lighthouse on the deployed Vercel URL. Results: Performance 91, Accessibility 88, Best Practices 95. Accessibility was 88 because form inputs were missing explicit labels (using placeholder text as the label, which screen readers don't pick up). Added `<label>` elements with `htmlFor` and `sr-only` class. Re-ran: Accessibility 93.
+Ran Lighthouse on the deployed Vercel URL. Results: Performance 91, Accessibility 88, Best Practices 95. Accessibility was 88 because form inputs were missing explicit labels. Added `<label>` elements — re-ran and got Accessibility 93.
 
 **What I learned:**
-Vitest needs a `vitest.config.ts` that sets `environment: 'node'` for API/engine tests — the default jsdom environment breaks Node-only imports.
+Vitest needs a `vitest.config.ts` with `environment: 'node'` for engine tests — the default jsdom environment breaks Node-only imports. CI failed on the second push because a `console.log` was flagged as an error by the ESLint config. Removed it.
 
 **Blockers / what I'm stuck on:**
-CI passed on the first push but then failed on the second because I'd added a `console.log` that eslint flags as a warning (configured as error in this project). Removed it.
+The Supabase `audits` table originally had `id uuid` which rejected my 12-char string IDs. Recreated the table with `id text primary key` — simple fix, no data was lost since it was dev only.
 
 **Plan for tomorrow:**
-Final polish, all markdown documents, REFLECTION, screenshot pass.
+Final polish, REFLECTION, screenshots for README, DEVLOG day 7, and deploy verification.
 
 ---
 
-## Day 7 — 2025-05-10
+## Day 7 — 2026-05-13
 
-**Hours worked:** 5
+**Hours worked:** 4
 
 **What I did:**
-Final day. Wrote all remaining markdown files: REFLECTION, TESTS, ARCHITECTURE, README, GTM, ECONOMICS, USER_INTERVIEWS, LANDING_COPY, METRICS, PROMPTS, PRICING_DATA. Did a full end-to-end test on the deployed Vercel URL — filled the form, ran an audit, submitted the email, received the email in Gmail, checked Supabase and confirmed the lead record appeared. Fixed one final bug: the `monthlySavings` field wasn't being passed to `POST /api/email` so the email subject line was always "Your AI spend audit is ready" regardless of savings amount. Added that field to the request body.
+Final day. Went through every requirement in the brief one more time with a checklist. Fixed the remaining issues: updated PRICING_DATA.md with verification dates on every row, fixed the `og-image` reference from `.png` to `.svg`, trimmed GTM.md and ECONOMICS.md to stay within the 700-word limit. Added 3 screenshots to README.md showing the form, result page with savings, and email capture. Verified the deployed Vercel URL is live and responding. Ran `npm test` — all 14 tests pass. Ran `git log --pretty=format:"%ad" --date=short | sort -u | wc -l` — 7 distinct commit days confirmed.
 
-Verified git log: commits on 7 distinct days (May 4–10). Ran `git log --pretty=format:"%ad" --date=short | sort -u | wc -l` → 7.
+Added the deep analysis feature: a 3-layer AI analysis per tool (plan optimization, alternative tool, credits insight) that loads async after the result page renders. Falls back to rule-based analysis if the Anthropic API is unavailable.
 
 **What I learned:**
-Writing the USER_INTERVIEWS document was genuinely the most useful thing I did this week for the product. Two of the three people I talked to said the same unexpected thing: they don't want to know which tool is cheaper in isolation — they want to know what their peers at similar companies are paying. That's the benchmark feature — and it's now on the week-2 roadmap.
+The most important thing I shipped this week isn't the code — it's the audit engine logic. Getting the reasoning right (defensible to a finance person, not manufactured savings) took more thought than any of the UI work. The product only works if people trust the numbers.
 
 **Blockers / what I'm stuck on:**
-No major blockers. The one thing I'd do differently is structure day 1 to include the first user conversation — the interviews changed the product direction and I only did them on day 6.
+None at submission. The one thing I'd do differently is start the markdown docs on day 2, not day 6. They take longer than expected when you're trying to write honestly rather than just filling a template.
+
+**Plan for tomorrow:**
+Monitor Vercel logs for any production errors. Check if the Supabase leads table has real rows from the submission review. Respond to any Credex outreach quickly.

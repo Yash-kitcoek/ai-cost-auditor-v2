@@ -13,7 +13,7 @@ interface Props {
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'https://aicostaudit.com';
   const auditUrl = `${baseUrl}/result/${params.id}`;
-  const ogImage = `${baseUrl}/og-image.png`;
+  const ogImage = `${baseUrl}/og-image.svg`;
 
   // Fetch real audit data server-side for dynamic metadata
   // Falls back to generic metadata if DB is offline or audit not found
