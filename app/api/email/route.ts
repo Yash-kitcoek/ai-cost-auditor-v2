@@ -27,26 +27,17 @@ export async function POST(req: NextRequest) {
     role?: string; teamSize?: number; monthlySavings?: number; honeypot?: string;
   };
 
-  try {
-    body = await req.json();
-  } catch {
-    return NextResponse.json({ error: 'Invalid JSON' }, { status: 400 });
-  }
+  try { body = await req.json(); }
+  catch { return NextResponse.json({ error: 'Invalid JSON' }, { status: 400 }); }
 
   if (body.honeypot) return NextResponse.json({ success: true });
-
-  if (!body.email?.includes('@')) {
-    return NextResponse.json({ error: 'Valid email required' }, { status: 400 });
-  }
-  if (!body.auditId) {
-    return NextResponse.json({ error: 'Invalid audit ID' }, { status: 400 });
-  }
+  if (!body.email?.includes('@')) return NextResponse.json({ error: 'Valid email required' }, { status: 400 });
+  if (!body.auditId) return NextResponse.json({ error: 'Invalid audit ID' }, { status: 400 });
 
   const safeSavings = typeof body.monthlySavings === 'number' ? body.monthlySavings : 0;
-  const safeTeamSize = typeof body.teamSize === 'number' && body.teamSize > 0
-    ? Math.round(body.teamSize) : undefined;
+  const safeTeamSize = typeof body.teamSize === 'number' && body.teamSize > 0 ? Math.round(body.teamSize) : undefined;
 
-  // Save to DB
+  // Save to DB always
   try {
     await saveLeadCapture(body.auditId, body.email, body.company, body.role, safeTeamSize);
   } catch (e) {
@@ -55,7 +46,7 @@ export async function POST(req: NextRequest) {
 
   const resendKey = process.env.RESEND_API_KEY;
   if (!resendKey || resendKey === 'your_resend_key') {
-    console.warn('[email] RESEND_API_KEY not set — skipping send');
+    console.warn('[email] RESEND_API_KEY not set');
     return NextResponse.json({ success: true, emailSent: false });
   }
 
@@ -66,17 +57,23 @@ export async function POST(req: NextRequest) {
     const resultUrl = `${baseUrl}/result/${body.auditId}`;
     const isHighSavings = safeSavings > 500;
 
-    // ── Resend free tier: can only send TO your own email without verified domain
-    // Use your own email as recipient, prefix subject with user's email
+    // ─────────────────────────────────────────────────────────────────────────
+    // RESEND FREE TIER RESTRICTION:
+    // Without a verified custom domain, Resend only allows sending TO the
+    // account owner's email (yashgaikwad3295@gmail.com).
+    // We always send to the owner, with the user's details in subject + body.
+    // Once you verify a domain at resend.com/domains, change RESEND_VERIFIED=true
+    // in Vercel env vars and emails will go directly to users.
+    // ─────────────────────────────────────────────────────────────────────────
     const OWNER_EMAIL = 'yashgaikwad3295@gmail.com';
-    const hasVerifiedDomain = baseUrl.includes('vercel.app') || baseUrl.includes('aicostaudit');
-    const recipient = hasVerifiedDomain ? body.email : OWNER_EMAIL;
+    const domainVerified = process.env.RESEND_DOMAIN_VERIFIED === 'true';
+    const recipient = domainVerified ? body.email : OWNER_EMAIL;
 
-    const subject = hasVerifiedDomain
+    const subject = domainVerified
       ? (safeSavings > 0
           ? `Your AI audit — $${safeSavings.toLocaleString()}/mo savings found`
           : 'Your AI spend audit is ready')
-      : `[${body.email}] AI audit — ${safeSavings > 0 ? `$${safeSavings.toLocaleString()}/mo savings` : 'optimized stack'}`;
+      : `[Lead] ${body.email}${body.company ? ` · ${body.company}` : ''} — ${safeSavings > 0 ? `$${safeSavings.toLocaleString()}/mo savings` : 'optimized stack'}`;
 
     const { error } = await resend.emails.send({
       from: 'onboarding@resend.dev',
@@ -88,7 +85,7 @@ export async function POST(req: NextRequest) {
         safeSavings,
         resultUrl,
         isHighSavings,
-        isOwnerCopy: !hasVerifiedDomain,
+        showLeadBanner: !domainVerified,
       }),
     });
 
@@ -97,7 +94,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ success: true, emailSent: false, warning: error.message });
     }
 
-    console.log(`[email] sent to ${recipient} for user ${body.email}`);
+    console.log(`[email] sent → ${recipient} (user: ${body.email})`);
     return NextResponse.json({ success: true, emailSent: true });
   } catch (e) {
     console.error('[resend] unexpected:', e);
@@ -107,9 +104,9 @@ export async function POST(req: NextRequest) {
 
 function buildEmailHTML(opts: {
   email: string; company?: string; safeSavings: number;
-  resultUrl: string; isHighSavings: boolean; isOwnerCopy: boolean;
+  resultUrl: string; isHighSavings: boolean; showLeadBanner: boolean;
 }): string {
-  const { email, company, safeSavings, resultUrl, isHighSavings, isOwnerCopy } = opts;
+  const { email, company, safeSavings, resultUrl, isHighSavings, showLeadBanner } = opts;
 
   return `<!DOCTYPE html>
 <html>
@@ -118,9 +115,10 @@ function buildEmailHTML(opts: {
 <div style="max-width:520px;margin:0 auto;padding:40px 20px">
   <div style="background:#111118;border:1px solid rgba(255,255,255,0.08);border-radius:16px;padding:32px">
 
-    ${isOwnerCopy ? `
+    ${showLeadBanner ? `
     <div style="background:rgba(99,102,241,0.1);border:1px solid rgba(99,102,241,0.2);border-radius:8px;padding:10px 14px;margin-bottom:20px;font-size:12px;color:#a5b4fc">
-      📋 Lead captured: <strong>${email}</strong>${company ? ` · ${company}` : ''}
+      📋 Lead: <strong>${email}</strong>${company ? ` · ${company}` : ''} · 
+      <a href="${resultUrl}" style="color:#a5b4fc">View their report</a>
     </div>` : ''}
 
     <div style="font-size:11px;color:#555;font-family:monospace;text-transform:uppercase;letter-spacing:1px;margin-bottom:12px">
@@ -139,8 +137,8 @@ function buildEmailHTML(opts: {
     </div>
     ` : `
     <div style="background:rgba(59,130,246,0.08);border:1px solid rgba(59,130,246,0.2);border-radius:12px;padding:20px;margin:0 0 20px;text-align:center">
-      <div style="font-size:18px;color:#60a5fa;font-weight:700">✓ Your stack is well optimized</div>
-      <div style="font-size:13px;color:#888;margin-top:6px">No major savings found — you're spending wisely.</div>
+      <div style="font-size:18px;color:#60a5fa;font-weight:700">✓ Stack is well optimized</div>
+      <div style="font-size:13px;color:#888;margin-top:6px">No major savings found.</div>
     </div>
     `}
 
