@@ -1,5 +1,6 @@
 export type UseCase = 'coding' | 'writing' | 'data' | 'research' | 'mixed';
 
+
 export type ToolId =
   | 'cursor'
   | 'github-copilot'
