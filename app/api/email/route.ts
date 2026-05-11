@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { saveLeadCapture } from '@/lib/db/supabase';
+export const dynamic = 'force-dynamic';
 
 const emailRateLimit = new Map<string, { count: number; resetAt: number }>();
 

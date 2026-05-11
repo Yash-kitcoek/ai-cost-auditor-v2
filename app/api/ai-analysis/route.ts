@@ -6,6 +6,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { generateDeepAnalysis } from '@/lib/ai/deepAnalysis';
 import { AuditResult, AuditInput } from '@/lib/audit/types';
+export const dynamic = 'force-dynamic';
 
 // Simple rate limiter — 20 deep analyses per IP per hour
 const rateMap = new Map<string, { count: number; resetAt: number }>();

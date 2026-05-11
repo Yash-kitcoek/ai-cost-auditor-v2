@@ -3,6 +3,7 @@ import { runAudit } from '@/lib/audit/engine';
 import { generateAISummary } from '@/lib/ai/claude';
 import { saveAudit } from '@/lib/db/supabase';
 import { AuditInput } from '@/lib/audit/types';
+export const dynamic = 'force-dynamic';
 
 const rateLimitMap = new Map<string, { count: number; resetAt: number }>();
 
