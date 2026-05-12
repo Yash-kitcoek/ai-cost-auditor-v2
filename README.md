@@ -13,6 +13,8 @@ A free, no-login web app that audits your AI tool subscriptions in 60 seconds, s
 ![alt text](image-2.png)
 ![alt text](image-3.png)
 ![alt text](image-4.png)
+![alt text](image-5.png)
+![alt text](image-6.png)
 >
 > Suggested Loom script (30s): show the form → fill in Cursor Pro + GitHub Copilot Business + Claude Team → click Audit → show savings hero → scroll to recommendations → show lead capture → submit email.
 
