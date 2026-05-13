@@ -93,7 +93,6 @@ hCaptcha adds a visible challenge that hurts conversion for a tool aimed at busy
 - **Styling:** Tailwind CSS (layout) + inline styles (result page colours)
 - **Database:** Supabase (Postgres)
 - **Email:** Resend
-- **AI:** Anthropic Claude API (`claude-sonnet-4-20250514`)
 - **Deployment:** Vercel
 - **Tests:** Vitest
 - **CI:** GitHub Actions
