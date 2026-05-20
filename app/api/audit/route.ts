@@ -1,58 +1,60 @@
+// app/api/audit/route.ts
+// POST /api/audit
+// Round 2 version: requires email upfront so the audit can be linked
+// to a user for pricing-change notifications.
+// Body: { email: string, tools: { [toolKey]: tierName }, usage?: { [toolKey]: number } }
+
 import { NextRequest, NextResponse } from 'next/server';
-import { runAudit } from '@/lib/audit/engine';
-import { generateAISummary } from '@/lib/ai/claude';
-import { saveAudit } from '@/lib/db/supabase';
-import { AuditInput } from '@/lib/audit/types';
+import { generateAuditWithSnapshot } from '@/lib/audit-engine';
+import { saveAudit } from '@/lib/db';
+
 export const dynamic = 'force-dynamic';
 
-const rateLimitMap = new Map<string, { count: number; resetAt: number }>();
-
-function isRateLimited(ip: string): boolean {
-  const now = Date.now();
-  const entry = rateLimitMap.get(ip);
-  if (!entry || now > entry.resetAt) {
-    rateLimitMap.set(ip, { count: 1, resetAt: now + 3600_000 });
-    return false;
-  }
-  if (entry.count >= 10) return true;
-  entry.count++;
-  return false;
-}
-
-// ✅ No nanoid — uses built-in crypto (works in all Next.js versions)
-function generateId(): string {
-  return crypto.randomUUID().replace(/-/g, '').slice(0, 12);
-}
-
 export async function POST(req: NextRequest) {
-  const ip = req.headers.get('x-forwarded-for')?.split(',')[0]?.trim() || 'unknown';
-  if (isRateLimited(ip)) {
-    return NextResponse.json({ error: 'Too many requests.' }, { status: 429 });
-  }
-
-  let body: { input: AuditInput; honeypot?: string };
   try {
-    body = await req.json();
-  } catch {
-    return NextResponse.json({ error: 'Invalid JSON' }, { status: 400 });
-  }
+    const body = await req.json();
+    const { email, tools, usage } = body;
 
-  if (body.honeypot) {
-    return NextResponse.json({ error: 'Bot detected' }, { status: 400 });
-  }
+    if (!email || typeof email !== 'string' || !email.includes('@')) {
+      return NextResponse.json(
+        { error: 'A valid email is required to save your audit for future notifications.' },
+        { status: 400 }
+      );
+    }
 
-  if (!body.input?.tools?.length) {
-    return NextResponse.json({ error: 'Add at least one tool.' }, { status: 400 });
-  }
+    if (!tools || typeof tools !== 'object' || Object.keys(tools).length === 0) {
+      return NextResponse.json(
+        { error: 'At least one tool is required.' },
+        { status: 400 }
+      );
+    }
 
-  try {
-    const result = runAudit(body.input);
-    result.summary = await generateAISummary(result);
-    const id = generateId();
-    await saveAudit({ id, input: body.input, result, createdAt: new Date().toISOString() });
-    return NextResponse.json({ id, result });
-  } catch (err) {
-    console.error('Audit error:', err);
-    return NextResponse.json({ error: 'Audit failed. Please try again.' }, { status: 500 });
+    const { input, output, pricingSnapshot } = generateAuditWithSnapshot({
+      email,
+      tools,
+      usage,
+    });
+
+    const saved = await saveAudit({
+      user_email: email,
+      input_stack: input,
+      output_result: output,
+      pricing_snapshot: pricingSnapshot,
+    });
+
+    const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
+
+    return NextResponse.json({
+      success: true,
+      auditId: saved.id,
+      result: output,
+      reauditUrl: `${appUrl}/reaudit/${saved.id}`,
+    });
+  } catch (error: any) {
+    console.error('[audit] error:', error);
+    return NextResponse.json(
+      { error: 'Audit failed', details: error.message },
+      { status: 500 }
+    );
   }
 }
