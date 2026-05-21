@@ -2,7 +2,8 @@
 
 A free, no-login web app that audits your AI tool subscriptions in 60 seconds, shows exactly where you're overspending, and quantifies potential savings down to the dollar. Built as a lead-generation asset for [Credex](https://credex.rocks).
 
-**Live URL:** https://ai-cost-auditor-v2.vercel.app
+**Round 1 :** https://ai-cost-auditor-v2.vercel.app
+**Round 2 :** https://ai-cost-auditor-v2-nw5k-git-round-105c01-yash-kitcoeks-projects.vercel.app/
 
 ---
 
