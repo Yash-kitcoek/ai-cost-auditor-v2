@@ -35,7 +35,7 @@ GET /reaudit/[id]  (user clicks link in email)
   → client: calculateAuditDiff() → renders side-by-side diff
 ```
 
-New files: `lib/db.ts`, `lib/audit-engine.ts`, `lib/pricing.ts`, `lib/diff-calculator.ts`, `lib/email.ts`, `app/api/detect-changes/route.ts`, `app/api/reaudit/route.ts`, `app/api/unsubscribe/route.ts`, `app/api/admin/dashboard/route.ts`, `app/reaudit/[id]/page.tsx`, `app/changes/page.tsx`, `supabase/migrations/001_round2_reaudit.sql`
+New files: `lib/db.ts`, `lib/audit-engine.ts`, `lib/audit-adapter.ts`, `lib/pricing.ts`, `lib/diff-calculator.ts`, `lib/email.ts`, `app/api/detect-changes/route.ts`, `app/api/reaudit/route.ts`, `app/api/unsubscribe/route.ts`, `app/api/admin/dashboard/route.ts`, `app/reaudit/[id]/page.tsx`, `app/changes/page.tsx`, `supabase/migrations/001_round2_reaudit.sql`, `tests/round2.test.ts`
 
 ## What I cut
 
@@ -43,9 +43,7 @@ New files: `lib/db.ts`, `lib/audit-engine.ts`, `lib/pricing.ts`, `lib/diff-calcu
 
 - **Vercel Cron** — used GitHub Actions schedule instead (`pricing-check.yml`). Vercel Cron requires Pro plan; GitHub Actions is free and already in the repo. Same result, no new dependency.
 
-- **Tests for the new engine** — `tests/audit.test.ts` covers the Round 1 engine. I ran the detection flow manually end-to-end and verified via DB logs, but didn't write vitest cases for `lib/audit-engine.ts` or `lib/diff-calculator.ts`. First thing I'd add with more time.
-
-- **Diff view for the original form** — the main `page.tsx` form still uses the Round 1 engine (`lib/audit/engine.ts`). The new Round 2 audit route expects `{ email, tools: { toolKey: tierName } }`. The two engines coexist rather than being merged. A proper unification would take another day.
+- **Deep API integration tests** — the pure Round 2 logic is covered in Vitest, and the full Supabase/Resend path is documented for manual testing because it needs live credentials.
 
 - **`app/changes/page.tsx` styling** — the public changes page is functional but minimal. It shows logged changes in a clean card layout but doesn't have charts or filtering.
 
@@ -53,7 +51,7 @@ New files: `lib/db.ts`, `lib/audit-engine.ts`, `lib/pricing.ts`, `lib/diff-calcu
 
 **Setup:**
 1. Run the SQL migration in Supabase: `supabase/migrations/001_round2_reaudit.sql`
-2. Confirm `.env.local` has `NEXT_PUBLIC_SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, `RESEND_API_KEY`, `NEXT_PUBLIC_APP_URL`, `CRON_SECRET`
+2. Confirm `.env.local` has `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY`, `RESEND_API_KEY`, `NEXT_PUBLIC_APP_URL`, `NEXT_PUBLIC_BASE_URL`, `CRON_SECRET`
 
 **Full flow:**
 
@@ -95,6 +93,7 @@ curl http://localhost:3000/api/admin/dashboard \
 ## What's tested
 
 - `tests/audit.test.ts` — covers Round 1 `runAudit()` engine (savings calculation, score, isAlreadyOptimal, one-rec-per-tool)
+- `tests/round2.test.ts` — covers pricing snapshot diffing, audit diffing, and the adapter that keeps `/result/:id` compatible with stored Round 2 audits
 - Manual end-to-end: audit → price change → detect → email → diff view ✓
 - `calculateAuditDiff` manually verified with known inputs
 

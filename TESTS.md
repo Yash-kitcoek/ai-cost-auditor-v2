@@ -73,6 +73,18 @@ npx vitest run tests/rules.test.ts
 
 ---
 
-## Total: 17 tests across 3 files
+### `tests/round2.test.ts` — Re-audit flow
+
+Tests the Round 2 pricing-change pieces that do not require live Supabase or Resend credentials.
+
+| Test | What it covers |
+|---|---|
+| Stored audit output can produce a later diff | `calculateAuditDiff()` catches changed costs/savings/recommendations |
+| Pricing snapshots detect price moves | `comparePricingSnapshots()` flags tier price changes |
+| Round 2 output maps to result page shape | `adaptAuditOutputForResultPage()` keeps shared `/result/:id` links compatible |
+
+---
+
+## Total: 20 tests across 4 files
 
 All tests run in under 200ms (pure TypeScript, no network calls). The test suite covers the audit engine — the most business-critical layer. API routes and the Supabase/Resend integrations are not unit-tested (they require live credentials) but are covered by manual end-to-end testing on the deployed URL.

@@ -5,7 +5,8 @@
 // Fields kept: input.tools, input.teamSize, input.useCase, result.*, id, createdAt
 
 import { NextRequest, NextResponse } from 'next/server';
-import { getAudit } from '@/lib/db/supabase';
+import { adaptAuditOutputForResultPage } from '../../../../lib/audit-adapter';
+import { getAudit } from '@/lib/db';
 export const dynamic = 'force-dynamic';
 
 export async function GET(
@@ -21,19 +22,18 @@ export async function GET(
     return NextResponse.json({ error: 'Audit not found' }, { status: 404 });
   }
 
-  // ── PII stripping ──────────────────────────────────────────────────────────
-  // audit.input is JSONB from Supabase — cast to Record<string, unknown> first.
-  // Using delete avoids the TypeScript index-signature conflict that happens
-  // when you try to destructure named props alongside [key: string]: unknown.
-  const safeInput = { ...(audit.input as unknown as Record<string, unknown>) };
+  const safeInput = { ...(audit.input_stack as Record<string, unknown>) };
   delete safeInput['email'];
   delete safeInput['company'];
   delete safeInput['role'];
 
   return NextResponse.json({
     id: audit.id,
-    createdAt: audit.createdAt,
+    createdAt: audit.created_at,
     input: safeInput,   // tools, teamSize, useCase only — no PII
-    result: audit.result,
+    result: adaptAuditOutputForResultPage(audit.output_result, {
+      teamSize: Number(safeInput.teamSize) || 1,
+      useCase: (safeInput.useCase as any) || 'mixed',
+    }),
   });
 }

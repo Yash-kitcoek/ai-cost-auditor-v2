@@ -52,9 +52,12 @@ npm test
 |---|---|
 | `NEXT_PUBLIC_SUPABASE_URL` | Supabase project → Settings → API → Project URL |
 | `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Supabase project → Settings → API → anon public key |
+| `SUPABASE_SERVICE_ROLE_KEY` | Supabase project → Settings → API → service role key, server-side only |
 | `ANTHROPIC_API_KEY` | console.anthropic.com → API Keys |
 | `RESEND_API_KEY` | resend.com → API Keys |
 | `NEXT_PUBLIC_BASE_URL` | Your deployed URL (e.g. `https://ai-cost-auditor-v2.vercel.app`) |
+| `NEXT_PUBLIC_APP_URL` | Same deployed URL, used in re-audit email links |
+| `CRON_SECRET` | Long random string used by GitHub Actions or manual calls to `/api/detect-changes` |
 
 ---
 
@@ -65,6 +68,7 @@ npm test
 3. **Results page** — per-tool breakdown with savings, a hero showing total monthly + annual savings, AI-generated 100-word summary, and a Credex CTA for audits showing >$500/mo savings.
 4. **Lead capture** — email gate after value is shown (never before). Stored in Supabase, confirmation sent via Resend. Honeypot + IP rate limiting for abuse protection.
 5. **Shareable URL** — each audit gets a unique ID. PII (email, company) stripped from the public version. Open Graph + Twitter Card tags for clean link previews.
+6. **Re-audit on pricing change** — completed audits are stored with user email, input stack, output result, and pricing snapshot. `/api/detect-changes` compares stored snapshots against current pricing, sends one consolidated Resend email per affected user, and links to `/reaudit/:id` for a side-by-side diff.
 
 ---
 

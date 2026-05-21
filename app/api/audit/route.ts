@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { generateAuditWithSnapshot } from '@/lib/audit-engine';
+import { adaptAuditOutputForResultPage } from '../../../lib/audit-adapter';
 import { saveAudit } from '@/lib/db';
 
 export const dynamic = 'force-dynamic';
@@ -28,38 +29,10 @@ export async function POST(req: NextRequest) {
     }
 
     const { input, output, pricingSnapshot } = generateAuditWithSnapshot({
-      email, tools, usage,
+      email, tools, usage, teamSize, useCase,
     });
 
-    const totalCurrentSpend = output.totalMonthlyCost;
-    const totalOptimizedSpend = totalCurrentSpend - output.totalPotentialSavings;
-    const score = totalCurrentSpend === 0
-      ? 100
-      : Math.max(0, Math.round(100 - (output.totalPotentialSavings / totalCurrentSpend) * 100));
-
-    // Shape result to match exactly what app/result/[id]/page.tsx reads
-    const result = {
-      totalMonthlySavings:  output.totalPotentialSavings,
-      totalAnnualSavings:   output.totalPotentialSavings * 12,
-      totalCurrentSpend,                           // ← was wrongly named currentMonthlySpend
-      totalOptimizedSpend,                         // ← was wrongly named optimizedMonthlySpend
-      score,
-      isAlreadyOptimal: output.totalPotentialSavings === 0,
-      teamSize: teamSize || 1,                     // ← was missing
-      useCase:  useCase  || 'mixed',               // ← was missing
-      summary:  undefined,                         // optional AI summary field
-      recommendations: output.recommendations.map((rec) => ({
-        toolId:          rec.tool.toLowerCase().replace(/\s+/g, '-'),
-        toolName:        rec.tool,
-        action:          rec.savings > 0 ? 'downgrade' : 'keep',
-        currentPlan:     rec.currentTier,
-        recommendedPlan: rec.recommendedTier,
-        savings:         rec.savings,
-        annualSavings:   rec.savings * 12,
-        reason:          rec.reason,
-        priority:        rec.savings > 50 ? 'high' : rec.savings > 20 ? 'medium' : 'low',
-      })),
-    };
+    const result = adaptAuditOutputForResultPage(output, { teamSize, useCase });
 
     const saved = await saveAudit({
       user_email:       email,

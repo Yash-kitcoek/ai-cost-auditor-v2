@@ -19,7 +19,7 @@ export const PRICING_DATA: Record<string, Tool> = {
     lastUpdated: '2026-05-20',
     tiers: [
       { name: 'Free',     price: 0,  period: 'month', features: ['2000 completions/month'] },
-      { name: 'Pro',      price: 20, period: 'month', features: ['Unlimited completions'] },
+      { name: 'Pro', price: 20, period: 'month', features: ['Unlimited completions'] },
       { name: 'Business', price: 40, period: 'month', features: ['All Pro features', 'Team management'] },
     ],
   },

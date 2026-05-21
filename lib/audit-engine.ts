@@ -8,6 +8,8 @@ export interface AuditInput {
   usage?: {
     [key: string]: number;
   };
+  teamSize?: number;
+  useCase?: string;
 }
 
 export interface AuditRecommendation {
