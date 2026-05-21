@@ -11,13 +11,16 @@ export const dynamic = 'force-dynamic';
 
 export async function GET(
   _req: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> } // 1. Typed params as a Promise
 ) {
-  if (!params.id) {
+  const resolvedParams = await params; // 2. Await the params promise
+  const id = resolvedParams.id;
+
+  if (!id) {
     return NextResponse.json({ error: 'ID required' }, { status: 400 });
   }
 
-  const audit = await getAudit(params.id);
+  const audit = await getAudit(id);
   if (!audit) {
     return NextResponse.json({ error: 'Audit not found' }, { status: 404 });
   }
