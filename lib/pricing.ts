@@ -18,94 +18,87 @@ export const PRICING_DATA: Record<string, Tool> = {
     category: 'ide',
     lastUpdated: '2026-05-20',
     tiers: [
-      {
-        name: 'Free',
-        price: 0,
-        period: 'month',
-        features: ['2000 completions/month', 'Basic AI assistance'],
-      },
-      {
-        name: 'Pro',
-        price: 20,
-        period: 'month',
-        features: ['Unlimited completions', 'GPT-4', 'Priority support'],
-      },
+      { name: 'Free',     price: 0,  period: 'month', features: ['2000 completions/month'] },
+      { name: 'Pro', price: 20, period: 'month', features: ['Unlimited completions'] },
+      { name: 'Business', price: 40, period: 'month', features: ['All Pro features', 'Team management'] },
     ],
   },
-  github_copilot: {
+
+  'github-copilot': {
     name: 'GitHub Copilot',
     category: 'ide',
     lastUpdated: '2026-05-20',
     tiers: [
-      {
-        name: 'Individual',
-        price: 10,
-        period: 'month',
-        features: ['Code completions', 'Chat', 'CLI'],
-      },
-      {
-        name: 'Business',
-        price: 19,
-        period: 'month',
-        features: ['All Individual features', 'Organization license', 'Policy management'],
-      },
+      { name: 'Free',       price: 0,  period: 'month', features: ['Limited completions'] },
+      { name: 'Individual', price: 10, period: 'month', features: ['Unlimited completions'] },
+      { name: 'Business',   price: 19, period: 'month', features: ['All Individual features', 'Org management'] },
+      { name: 'Enterprise', price: 39, period: 'month', features: ['All Business features', 'Enterprise SSO'] },
     ],
   },
+
   claude: {
-    name: 'Claude (Anthropic)',
+    name: 'Claude',
     category: 'api',
     lastUpdated: '2026-05-20',
     tiers: [
-      {
-        name: 'Free',
-        price: 0,
-        period: 'month',
-        features: ['Limited messages'],
-      },
-      {
-        name: 'Pro',
-        price: 20,
-        period: 'month',
-        features: ['5x usage', 'Priority access', 'Early features'],
-      },
+      { name: 'Free',       price: 0,  period: 'month', features: ['Limited messages'] },
+      { name: 'Pro',        price: 20, period: 'month', features: ['5x usage', 'Priority access'] },
+      { name: 'Team',       price: 30, period: 'month', features: ['All Pro features', 'Team workspace'] },
+      { name: 'Enterprise', price: 60, period: 'month', features: ['All Team features', 'SSO', 'Admin controls'] },
     ],
   },
+
   chatgpt: {
     name: 'ChatGPT',
     category: 'api',
     lastUpdated: '2026-05-20',
     tiers: [
-      {
-        name: 'Free',
-        price: 0,
-        period: 'month',
-        features: ['GPT-3.5', 'Limited GPT-4'],
-      },
-      {
-        name: 'Plus',
-        price: 20,
-        period: 'month',
-        features: ['GPT-4', 'DALL-E', 'Priority access'],
-      },
+      { name: 'Free',       price: 0,  period: 'month', features: ['GPT-3.5'] },
+      { name: 'Plus',       price: 20, period: 'month', features: ['GPT-4', 'DALL-E'] },
+      { name: 'Team',       price: 30, period: 'month', features: ['All Plus features', 'Team workspace'] },
+      { name: 'Enterprise', price: 60, period: 'month', features: ['All Team features', 'SSO', 'Admin controls'] },
     ],
   },
-  perplexity: {
-    name: 'Perplexity',
-    category: 'search',
+
+  'anthropic-api': {
+    name: 'Anthropic API',
+    category: 'api',
     lastUpdated: '2026-05-20',
     tiers: [
-      {
-        name: 'Free',
-        price: 0,
-        period: 'month',
-        features: ['5 Pro searches/day'],
-      },
-      {
-        name: 'Pro',
-        price: 20,
-        period: 'month',
-        features: ['Unlimited Pro searches', 'File upload', 'API access'],
-      },
+      { name: 'Free',       price: 0,   period: 'month', features: ['Limited credits'] },
+      { name: 'Pay-as-you-go', price: 0, period: 'month', features: ['Usage-based pricing'] },
+    ],
+  },
+
+  'openai-api': {
+    name: 'OpenAI API',
+    category: 'api',
+    lastUpdated: '2026-05-20',
+    tiers: [
+      { name: 'Free',          price: 0, period: 'month', features: ['Limited credits'] },
+      { name: 'Pay-as-you-go', price: 0, period: 'month', features: ['Usage-based pricing'] },
+    ],
+  },
+
+  gemini: {
+    name: 'Gemini',
+    category: 'api',
+    lastUpdated: '2026-05-20',
+    tiers: [
+      { name: 'Free',                  price: 0,  period: 'month', features: ['Limited usage'] },
+      { name: 'Gemini for Workspace',  price: 24, period: 'month', features: ['Workspace integration'] },
+      { name: 'Enterprise',            price: 36, period: 'month', features: ['Advanced features', 'SSO'] },
+    ],
+  },
+
+  windsurf: {
+    name: 'Windsurf',
+    category: 'ide',
+    lastUpdated: '2026-05-20',
+    tiers: [
+      { name: 'Free', price: 0,  period: 'month', features: ['Limited usage'] },
+      { name: 'Pro',  price: 15, period: 'month', features: ['Unlimited usage'] },
+      { name: 'Team', price: 30, period: 'month', features: ['All Pro features', 'Team management'] },
     ],
   },
 };
@@ -132,14 +125,14 @@ function calculateVersion(data: typeof PRICING_DATA): string {
 export function comparePricingSnapshots(oldSnapshot: any, newSnapshot: any) {
   const changes: Array<{
     tool: string;
-    changeType: 'price_change' | 'tier_added' | 'tier_removed' | 'feature_change';
+    changeType: 'price_change' | 'tier_added' | 'tier_removed';
     oldValue?: any;
     newValue?: any;
     details: string;
   }> = [];
 
-  const oldTools = oldSnapshot.data || {};
-  const newTools = newSnapshot.data || {};
+  const oldTools = oldSnapshot?.data || {};
+  const newTools = newSnapshot?.data || {};
 
   for (const toolKey in newTools) {
     if (!oldTools[toolKey]) continue;
@@ -147,7 +140,6 @@ export function comparePricingSnapshots(oldSnapshot: any, newSnapshot: any) {
     const oldTool = oldTools[toolKey];
     const newTool = newTools[toolKey];
 
-    // Check price changes
     for (let i = 0; i < Math.max(oldTool.tiers.length, newTool.tiers.length); i++) {
       const oldTier = oldTool.tiers[i];
       const newTier = newTool.tiers[i];

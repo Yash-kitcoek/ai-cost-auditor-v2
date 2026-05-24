@@ -24,7 +24,6 @@ const TOOL_ICONS: Record<ToolId, string> = {
   'anthropic-api': '🧠', 'openai-api': '🤖', gemini: '♊', windsurf: '🏄',
 };
 
-// Input styles reused
 const inputStyle = {
   background: 'rgba(255,255,255,0.05)',
   border: '1px solid rgba(255,255,255,0.1)',
@@ -40,8 +39,8 @@ export default function HomePage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [honeypot, setHoneypot] = useState('');
+  const [email, setEmail] = useState('');
 
-  // Only sum non-usage-based tools for display
   const totalSpend = input.tools.reduce((sum, t) => sum + (t.monthlySpend || 0), 0);
   const hasUsageBased = input.tools.some((t) => {
     const plan = PRICING[t.toolId]?.find((p) => p.planId === t.plan);
@@ -50,17 +49,44 @@ export default function HomePage() {
 
   async function handleSubmit() {
     if (!input.tools.length) { setError('Add at least one AI tool.'); return; }
-    setError(''); setLoading(true);
+    if (!email || !email.includes('@')) { setError('A valid email is required for pricing-change alerts.'); return; }
+
+    setError('');
+    setLoading(true);
+
     try {
+      const toolsMap: Record<string, string> = {};
+      const usageMap: Record<string, number> = {};
+
+      for (const tool of input.tools) {
+        const plans = PRICING[tool.toolId] || [];
+        const matchedPlan = plans.find((p) => p.planId === tool.plan);
+        const tierName = matchedPlan?.label || tool.plan;
+        toolsMap[tool.toolId] = tierName;
+        if (tool.monthlySpend && tool.monthlySpend > 0) {
+          usageMap[tool.toolId] = tool.monthlySpend;
+        }
+      }
+
       const res = await fetch('/api/audit', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ input, honeypot }),
+        body: JSON.stringify({
+          email,
+          tools: toolsMap,
+          usage: usageMap,
+          honeypot,
+          teamSize: input.teamSize,   // ← fixes benchmark NaN
+          useCase: input.useCase,     // ← fixes benchmark NaN
+        }),
       });
+
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'Audit failed');
-      localStorage.setItem(`audit-${data.id}`, JSON.stringify(data));
-      router.push(`/result/${data.id}`);
+
+      const auditId = data.auditId || data.id;
+      localStorage.setItem(`audit-${auditId}`, JSON.stringify(data));
+      router.push(`/result/${auditId}`);
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : 'Something went wrong.');
       setLoading(false);
@@ -136,7 +162,6 @@ export default function HomePage() {
             Select AI Tools You Pay For
           </label>
 
-          {/* Tool grid */}
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 8, marginBottom: 20 }}>
             {ALL_TOOLS.map((toolId) => {
               const active = input.tools.some((t) => t.toolId === toolId);
@@ -160,21 +185,15 @@ export default function HomePage() {
             })}
           </div>
 
-          {/* Per-tool config rows */}
           {input.tools.length > 0 && (
             <div style={{ borderTop: '1px solid rgba(255,255,255,0.06)', paddingTop: 16 }}>
-
-              {/* Column headers */}
               <div style={{
                 display: 'grid', gridTemplateColumns: '2fr 2fr 1fr 1.5fr',
                 gap: 8, marginBottom: 10,
                 fontSize: 10, color: '#444', fontFamily: 'monospace',
                 textTransform: 'uppercase', letterSpacing: 1,
               }}>
-                <span>Tool</span>
-                <span>Plan</span>
-                <span>Seats</span>
-                <span>$/mo</span>
+                <span>Tool</span><span>Plan</span><span>Seats</span><span>$/mo</span>
               </div>
 
               {input.tools.map((tool) => {
@@ -187,8 +206,6 @@ export default function HomePage() {
                     display: 'grid', gridTemplateColumns: '2fr 2fr 1fr 1.5fr',
                     gap: 8, alignItems: 'center', marginBottom: 10,
                   }}>
-
-                    {/* Tool name */}
                     <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 13, color: '#ccc' }}>
                       <span>{TOOL_ICONS[tool.toolId]}</span>
                       <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
@@ -196,13 +213,12 @@ export default function HomePage() {
                       </span>
                     </div>
 
-                    {/* Plan dropdown */}
                     <select
                       value={tool.plan}
                       onChange={(e) => {
                         const plan = plans.find((p) => p.planId === e.target.value);
                         const newSpend = plan?.isUsageBased
-                          ? tool.monthlySpend // keep user's entered spend
+                          ? tool.monthlySpend
                           : (plan?.pricePerSeat || 0) * tool.seats;
                         updateTool(tool.toolId, { plan: e.target.value, monthlySpend: newSpend });
                       }}
@@ -215,7 +231,6 @@ export default function HomePage() {
                       ))}
                     </select>
 
-                    {/* Seats — disabled for usage-based */}
                     <input
                       type="number" min={1} value={tool.seats}
                       disabled={isUsageBased}
@@ -234,7 +249,6 @@ export default function HomePage() {
                       }}
                     />
 
-                    {/* Spend — shows "Usage-based" badge OR editable input */}
                     {isUsageBased ? (
                       <div style={{ position: 'relative' }}>
                         <span style={{ position: 'absolute', left: 8, top: '50%', transform: 'translateY(-50%)', color: '#6366f1', fontSize: 12 }}>$</span>
@@ -243,10 +257,8 @@ export default function HomePage() {
                           value={tool.monthlySpend || ''}
                           placeholder="0"
                           onChange={(e) => updateTool(tool.toolId, { monthlySpend: parseFloat(e.target.value) || 0 })}
-                          title="Enter your actual monthly API spend from your billing dashboard"
                           style={{
-                            ...inputStyle,
-                            paddingLeft: 20,
+                            ...inputStyle, paddingLeft: 20,
                             background: 'rgba(99,102,241,0.06)',
                             border: '1px solid rgba(99,102,241,0.2)',
                             color: '#a5b4fc',
@@ -267,7 +279,6 @@ export default function HomePage() {
                 );
               })}
 
-              {/* Usage-based hint */}
               {hasUsageBased && (
                 <div style={{
                   marginTop: 8, paddingTop: 10,
@@ -277,7 +288,7 @@ export default function HomePage() {
                 }}>
                   <span style={{ color: '#6366f1' }}>💡</span>
                   <span>
-                    For usage-based APIs, enter your <strong style={{ color: '#777' }}>actual last month's bill</strong> from your provider dashboard.
+                    For usage-based APIs, enter your <strong style={{ color: '#777' }}>actual last month&apos;s bill</strong> from your provider dashboard.
                   </span>
                 </div>
               )}
@@ -285,14 +296,31 @@ export default function HomePage() {
           )}
         </div>
 
-        {/* Honeypot — hidden from real users */}
+        {/* ── EMAIL ── */}
+        <div style={{ background: '#111118', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 16, padding: 24, marginBottom: 12 }}>
+          <label style={{ display: 'block', fontSize: 11, color: '#555', fontFamily: 'monospace', textTransform: 'uppercase', letterSpacing: 1, marginBottom: 8 }}>
+            Email — for pricing-change alerts
+          </label>
+          <input
+            type="email"
+            placeholder="you@company.com"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            style={{ ...inputStyle, padding: '10px 12px', fontSize: 14 }}
+          />
+          <p style={{ fontSize: 11, color: '#444', marginTop: 8, fontFamily: 'monospace' }}>
+            We&apos;ll notify you when AI tool pricing changes affect your audit. No spam.
+          </p>
+        </div>
+
+        {/* Honeypot */}
         <input
           type="text" name="website" value={honeypot}
           onChange={(e) => setHoneypot(e.target.value)}
           style={{ display: 'none' }} tabIndex={-1} autoComplete="off"
         />
 
-        {/* ── SUBMIT ── */}
+        {/* ── TOTAL + SUBMIT ── */}
         {input.tools.length > 0 && (
           <p style={{ textAlign: 'center', fontSize: 13, color: '#555', marginBottom: 8, fontFamily: 'monospace' }}>
             Current total:{' '}
@@ -325,11 +353,7 @@ export default function HomePage() {
             cursor: loading || !input.tools.length ? 'not-allowed' : 'pointer',
             transition: 'background 0.15s',
           }}>
-          {loading ? (
-            'Analyzing your stack...'
-          ) : (
-            `Run My AI Spend Audit →`
-          )}
+          {loading ? 'Analyzing your stack...' : 'Run My AI Spend Audit →'}
         </button>
 
         <p style={{ textAlign: 'center', fontSize: 12, color: '#333', marginTop: 10 }}>

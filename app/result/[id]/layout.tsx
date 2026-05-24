@@ -1,29 +1,29 @@
 // app/result/[id]/layout.tsx
 // SERVER COMPONENT — can export generateMetadata (unlike page.tsx which is 'use client')
-// Fetches real savings amount from Supabase to build dynamic OG + Twitter tags.
 
 import { Metadata } from 'next';
 import { getAudit } from '@/lib/db/supabase';
 
+// ✅ Next.js 15: params is now a Promise
 interface Props {
-  params: { id: string };
+  params: Promise<{ id: string }>;
   children: React.ReactNode;
 }
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
+  // ✅ Await params before destructuring
+  const { id } = await params;
+  
   const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'https://aicostaudit.com';
-  const auditUrl = `${baseUrl}/result/${params.id}`;
+  const auditUrl = `${baseUrl}/result/${id}`;
   const ogImage = `${baseUrl}/og-image.svg`;
 
-  // Fetch real audit data server-side for dynamic metadata
-  // Falls back to generic metadata if DB is offline or audit not found
   try {
-    const audit = await getAudit(params.id);
+    const audit = await getAudit(id);
     const savings = audit?.result?.totalMonthlySavings ?? 0;
     const annual = audit?.result?.totalAnnualSavings ?? savings * 12;
     const isOptimal = audit?.result?.isAlreadyOptimal ?? false;
 
-    // Dynamic title + description based on actual savings
     const title = isOptimal
       ? 'AI Spend Audit — Stack already optimised'
       : savings >= 500
@@ -33,12 +33,11 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
       : 'AI Spend Audit Report';
 
     const description = isOptimal
-      ? 'This team\'s AI stack is well-optimised. Run your own free audit in 60 seconds.'
+      ? "This team's AI stack is well-optimised. Run your own free audit in 60 seconds."
       : savings > 0
       ? `We found $${savings}/month ($${annual.toLocaleString()}/year) in AI tool overspend. See the full breakdown and check your own stack free.`
       : 'Free instant audit of AI tool spend. Find overspending in 60 seconds — no login required.';
 
-    // Dynamic share text for Twitter (shown in tweet when link is pasted)
     const twitterTitle = isOptimal
       ? 'AI Spend Audit — Well optimised stack'
       : savings > 500
@@ -70,7 +69,6 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
       },
     };
   } catch {
-    // DB offline or audit not found — return safe generic metadata
     return {
       title: 'AI Spend Audit Report',
       description: 'Free instant audit of AI tool spend. Find overspending in 60 seconds.',
@@ -85,13 +83,16 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
       twitter: {
         card: 'summary_large_image',
         title: 'AI Spend Audit',
-        description: 'Find out if you\'re overpaying for AI tools. Free, 60 seconds, no login.',
+        description: "Find out if you're overpaying for AI tools. Free, 60 seconds, no login.",
         images: [ogImage],
       },
     };
   }
 }
 
-export default function ResultLayout({ children }: Props) {
+// ✅ Also async + awaiting params in layout default export
+export default async function ResultLayout({ children, params }: Props) {
+  // We don't need id here but params must match the Promise type
+  await params; // satisfies Next.js 15 type constraint
   return <>{children}</>;
 }

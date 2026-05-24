@@ -1,8 +1,17 @@
 import { Resend } from 'resend';
 import { AuditDiff, formatDiffSummary } from './diff-calculator';
 
-const resend = new Resend(process.env.RESEND_API_KEY);
 const APP_URL = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
+const DOMAIN_VERIFIED = process.env.RESEND_DOMAIN_VERIFIED === 'true';
+const TEST_RECIPIENT = process.env.RESEND_TEST_RECIPIENT;
+
+function getResendClient() {
+  const apiKey = process.env.RESEND_API_KEY;
+  if (!apiKey || apiKey === 're_your-key-here') {
+    throw new Error('RESEND_API_KEY is required to send pricing-change emails');
+  }
+  return new Resend(apiKey);
+}
 
 export interface PricingChangeEmail {
   userEmail: string;
@@ -24,10 +33,67 @@ export async function sendPricingChangeEmail(params: PricingChangeEmail) {
     )
     .join('');
 
+  const recommendationImpactHtml = [
+    ...diff.changedRecommendations.map(
+      (change) => `
+      <li style="margin-bottom: 10px;">
+        <strong>${change.tool}</strong>:
+        previously recommended <strong>${change.oldRecommendation.recommendedTier}</strong>
+        with $${change.oldRecommendation.savings.toFixed(2)}/mo savings.
+        Current pricing recommends <strong>${change.newRecommendation.recommendedTier}</strong>
+        with $${change.newRecommendation.savings.toFixed(2)}/mo savings.
+      </li>
+    `
+    ),
+    ...diff.newRecommendations.map(
+      (rec) => `
+      <li style="margin-bottom: 10px;">
+        <strong>${rec.tool}</strong>: new recommendation to move from
+        <strong>${rec.currentTier}</strong> to <strong>${rec.recommendedTier}</strong>,
+        saving $${rec.savings.toFixed(2)}/mo.
+      </li>
+    `
+    ),
+    ...diff.removedRecommendations.map(
+      (rec) => `
+      <li style="margin-bottom: 10px;">
+        <strong>${rec.tool}</strong>: previous recommendation to move to
+        <strong>${rec.recommendedTier}</strong> is no longer triggered by current pricing.
+      </li>
+    `
+    ),
+  ].join('');
+
+  const recommendationImpactText = [
+    ...diff.changedRecommendations.map(
+      (change) =>
+        `- ${change.tool}: previously recommended ${change.oldRecommendation.recommendedTier} with $${change.oldRecommendation.savings.toFixed(2)}/mo savings; current pricing recommends ${change.newRecommendation.recommendedTier} with $${change.newRecommendation.savings.toFixed(2)}/mo savings.`
+    ),
+    ...diff.newRecommendations.map(
+      (rec) =>
+        `- ${rec.tool}: new recommendation to move from ${rec.currentTier} to ${rec.recommendedTier}, saving $${rec.savings.toFixed(2)}/mo.`
+    ),
+    ...diff.removedRecommendations.map(
+      (rec) =>
+        `- ${rec.tool}: previous recommendation to move to ${rec.recommendedTier} is no longer triggered by current pricing.`
+    ),
+  ].join('\n');
+
   const reauditUrl = `${APP_URL}/reaudit/${auditId}`;
   const unsubscribeUrl = `${APP_URL}/api/unsubscribe?audit_id=${auditId}`;
 
-  const impactEmoji = diff.savingsChange > 0 ? '💰' : diff.savingsChange < 0 ? '⚠️' : 'ℹ️';
+  const recipient = DOMAIN_VERIFIED ? userEmail : TEST_RECIPIENT;
+  if (!recipient) {
+    throw new Error(
+      'Set RESEND_TEST_RECIPIENT to your Resend account email, or set RESEND_DOMAIN_VERIFIED=true after verifying a domain.'
+    );
+  }
+
+  const subjectPrefix = diff.savingsChange > 0
+    ? 'More Savings Available'
+    : diff.savingsChange < 0
+    ? 'Pricing Changes Detected'
+    : 'Update Available';
 
   const html = `
     <!DOCTYPE html>
@@ -41,12 +107,12 @@ export async function sendPricingChangeEmail(params: PricingChangeEmail) {
         <table width="100%" cellpadding="0" cellspacing="0" style="max-width: 600px; margin: 0 auto; background-color: #ffffff;">
           <tr>
             <td style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); padding: 40px 20px; text-align: center;">
-              <h1 style="color: white; margin: 0; font-size: 28px;">🔔 AI Tool Pricing Update</h1>
+              <h1 style="color: white; margin: 0; font-size: 28px;">AI Tool Pricing Update</h1>
             </td>
           </tr>
           <tr>
             <td style="padding: 40px 30px;">
-              <p style="font-size: 16px; margin-bottom: 20px;">Hey there! 👋</p>
+              <p style="font-size: 16px; margin-bottom: 20px;">Hey there,</p>
               
               <p style="font-size: 16px; margin-bottom: 20px;">
                 We detected pricing changes for AI tools in your previous audit. Here's what changed:
@@ -65,13 +131,22 @@ export async function sendPricingChangeEmail(params: PricingChangeEmail) {
                   ${formatDiffSummary(diff)}
                 </p>
                 ${
+                  recommendationImpactHtml
+                    ? `<ul style="margin: 14px 0 0; padding-left: 20px; font-size: 14px;">
+                         ${recommendationImpactHtml}
+                       </ul>`
+                    : `<p style="margin: 14px 0 0; font-size: 14px;">
+                         Your recommendation stayed the same, but the underlying monthly cost and savings changed.
+                       </p>`
+                }
+                ${
                   diff.savingsChange > 0
                     ? `<p style="color: #10b981; font-weight: bold; margin: 10px 0; font-size: 16px;">
-                         💰 You could now save an additional $${diff.savingsChange.toFixed(2)}/month!
+                         You could now save an additional $${diff.savingsChange.toFixed(2)}/month!
                        </p>`
                     : diff.savingsChange < 0
                     ? `<p style="color: #f59e0b; font-weight: bold; margin: 10px 0; font-size: 16px;">
-                         ⚠️ Potential savings decreased by $${Math.abs(diff.savingsChange).toFixed(2)}/month
+                         Potential savings decreased by $${Math.abs(diff.savingsChange).toFixed(2)}/month
                        </p>`
                     : ''
                 }
@@ -82,7 +157,7 @@ export async function sendPricingChangeEmail(params: PricingChangeEmail) {
                   <td style="text-align: center;">
                     <a href="${reauditUrl}" 
                        style="display: inline-block; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 16px 32px; text-decoration: none; border-radius: 8px; font-weight: bold; font-size: 16px;">
-                      🔄 View Updated Audit
+                      View Updated Audit
                     </a>
                   </td>
                 </tr>
@@ -115,22 +190,22 @@ ${changes.map((c) => `- ${c.tool}: ${c.details}`).join('\n')}
 
 Impact: ${formatDiffSummary(diff)}
 
+Recommendation impact:
+${recommendationImpactText || '- Your recommendation stayed the same, but the underlying monthly cost and savings changed.'}
+
 View your updated audit: ${reauditUrl}
 
 Unsubscribe: ${unsubscribeUrl}
   `;
 
   try {
+    const resend = getResendClient();
     const { data, error } = await resend.emails.send({
       from: 'AI Cost Auditor <onboarding@resend.dev>', // Change this after domain verification
-      to: userEmail,
-      subject: `${impactEmoji} AI Tool Pricing Update - ${
-        diff.savingsChange > 0
-          ? 'More Savings Available!'
-          : diff.savingsChange < 0
-          ? 'Changes Detected'
-          : 'Update Available'
-      }`,
+      to: recipient,
+      subject: DOMAIN_VERIFIED
+        ? `AI Tool Pricing Update - ${subjectPrefix}`
+        : `[Test for ${userEmail}] AI Tool Pricing Update - ${subjectPrefix}`,
       html,
       text,
     });

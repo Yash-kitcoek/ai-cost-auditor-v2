@@ -1,12 +1,33 @@
 'use client';
 
-// app/reaudit/[id]/page.tsx
-// Shown when user clicks "View Updated Audit" in the pricing-change email.
-// Fetches old audit from DB, re-runs with current pricing, shows side-by-side diff.
-
 import { useEffect, useState } from 'react';
 import { useParams } from 'next/navigation';
-import { AuditDiff, calculateAuditDiff, formatDiffSummary } from '@/lib/diff-calculator';
+import {
+  AuditDiff,
+  calculateAuditDiff,
+  formatDiffSummary,
+} from '../../../lib/diff-calculator';
+
+function money(value: number | undefined) {
+  return `$${Number(value || 0).toFixed(2)}`;
+}
+
+function recommendationLabel(rec: any) {
+  if (!rec) return 'No recommendation';
+  return `${rec.currentTier} -> ${rec.recommendedTier}`;
+}
+
+function reasonText(change: AuditDiff['changedRecommendations'][number]) {
+  if (change.oldRecommendation.recommendedTier !== change.newRecommendation.recommendedTier) {
+    return `Recommended plan changed from ${change.oldRecommendation.recommendedTier} to ${change.newRecommendation.recommendedTier}.`;
+  }
+
+  if (change.oldRecommendation.savings !== change.newRecommendation.savings) {
+    return `Pricing changed the expected savings from ${money(change.oldRecommendation.savings)}/mo to ${money(change.newRecommendation.savings)}/mo.`;
+  }
+
+  return 'Pricing changed, but the recommendation is materially similar.';
+}
 
 export default function ReauditPage() {
   const { id } = useParams();
@@ -39,26 +60,23 @@ export default function ReauditPage() {
 
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-purple-600 to-purple-900">
-        <div className="text-white text-xl">Loading your updated audit...</div>
-      </div>
+      <main className="min-h-screen bg-slate-950 text-white flex items-center justify-center px-4">
+        <p className="text-lg">Loading updated audit...</p>
+      </main>
     );
   }
 
   if (error || !data || !diff) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-purple-600 to-purple-900 p-4">
-        <div className="bg-white p-8 rounded-lg shadow-xl max-w-md w-full">
-          <h1 className="text-2xl font-bold text-red-600 mb-4">Error</h1>
-          <p className="text-gray-700">{error || 'Failed to load audit data'}</p>
-          <a
-            href="/"
-            className="mt-6 inline-block text-purple-600 underline text-sm"
-          >
-            ← Run a new audit
+      <main className="min-h-screen bg-slate-950 text-white flex items-center justify-center px-4">
+        <section className="max-w-md rounded-lg bg-white p-6 text-slate-900">
+          <h1 className="text-xl font-bold text-red-600">Could not load re-audit</h1>
+          <p className="mt-3 text-sm text-slate-600">{error || 'Missing audit data.'}</p>
+          <a href="/" className="mt-5 inline-block text-sm font-semibold text-purple-700">
+            Run a new audit
           </a>
-        </div>
-      </div>
+        </section>
+      </main>
     );
   }
 
@@ -70,284 +88,256 @@ export default function ReauditPage() {
     removedRecommendations,
   } = diff;
 
-  const hasChanges =
+  const unchangedRecommendations = data.newAudit.recommendations.filter(
+    (rec: any) =>
+      !changedRecommendations.some((change) => change.tool === rec.tool) &&
+      !newRecommendations.some((newRec) => newRec.tool === rec.tool)
+  );
+
+  const hasRecommendationDiff =
     changedRecommendations.length > 0 ||
     newRecommendations.length > 0 ||
     removedRecommendations.length > 0;
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-purple-600 to-purple-900 py-12 px-4">
-      <div className="max-w-7xl mx-auto">
+    <main className="min-h-screen bg-slate-950 px-4 py-10 text-slate-100">
+      <div className="mx-auto max-w-6xl">
+        <section className="rounded-lg border border-white/10 bg-white p-6 text-slate-950 shadow-xl">
+          <p className="text-xs font-semibold uppercase tracking-wide text-purple-700">
+            Re-audit on pricing change
+          </p>
+          <h1 className="mt-2 text-3xl font-bold">Old vs new recommendation diff</h1>
+          <p className="mt-3 text-slate-600">{formatDiffSummary(diff)}</p>
 
-        {/* Header */}
-        <div className="bg-white rounded-lg shadow-xl p-6 md:p-8 mb-8">
-          <h1 className="text-2xl md:text-3xl font-bold text-gray-900 mb-4">
-            🔄 Updated Audit Results
-          </h1>
-          <div className="bg-gradient-to-r from-purple-100 to-pink-100 p-4 md:p-6 rounded-lg">
-            <p className="text-base md:text-lg font-semibold text-gray-800 mb-2">
-              {formatDiffSummary(diff)}
-            </p>
-            {savingsChange > 0 && (
-              <p className="text-green-600 font-bold text-lg md:text-xl">
-                💰 Additional ${savingsChange.toFixed(2)}/month in potential savings!
+          <div className="mt-6 grid gap-4 md:grid-cols-3">
+            <div className="rounded-lg bg-slate-100 p-4">
+              <p className="text-xs font-semibold uppercase text-slate-500">Old savings</p>
+              <p className="mt-1 text-2xl font-bold">
+                {money(data.oldAudit.totalPotentialSavings)}/mo
               </p>
-            )}
-            {savingsChange < 0 && (
-              <p className="text-orange-600 font-bold text-lg md:text-xl">
-                ⚠️ Potential savings decreased by ${Math.abs(savingsChange).toFixed(2)}/month
+            </div>
+            <div className="rounded-lg bg-emerald-50 p-4">
+              <p className="text-xs font-semibold uppercase text-emerald-700">New savings</p>
+              <p className="mt-1 text-2xl font-bold text-emerald-700">
+                {money(data.newAudit.totalPotentialSavings)}/mo
               </p>
-            )}
-            {savingsChange === 0 && costChange === 0 && !hasChanges && (
-              <p className="text-gray-600">
-                ✅ No material changes to your recommendations.
+            </div>
+            <div
+              className={`rounded-lg p-4 ${
+                savingsChange >= 0 ? 'bg-emerald-100' : 'bg-orange-100'
+              }`}
+            >
+              <p className="text-xs font-semibold uppercase text-slate-600">
+                Total savings delta
               </p>
-            )}
+              <p
+                className={`mt-1 text-2xl font-bold ${
+                  savingsChange >= 0 ? 'text-emerald-800' : 'text-orange-800'
+                }`}
+              >
+                {savingsChange >= 0 ? '+' : ''}
+                {money(savingsChange)}/mo
+              </p>
+            </div>
           </div>
-        </div>
 
-        {/* Side-by-side comparison */}
-        <div className="grid md:grid-cols-2 gap-6 md:gap-8">
+          {costChange !== 0 && (
+            <p className="mt-4 text-sm text-slate-500">
+              Monthly stack cost changed by {costChange > 0 ? '+' : ''}
+              {money(costChange)}/mo because the stored audit used an older pricing snapshot.
+            </p>
+          )}
+        </section>
 
-          {/* Old Audit */}
-          <div className="bg-white rounded-lg shadow-xl p-6 md:p-8">
-            <div className="flex items-center mb-6">
-              <span className="text-2xl mr-3">📊</span>
-              <div>
-                <h2 className="text-xl md:text-2xl font-bold text-gray-900">Previous Audit</h2>
-                {data.oldPricing?.timestamp && (
-                  <p className="text-sm text-gray-400 mt-1">
-                    {new Date(data.oldPricing.timestamp).toLocaleDateString()}
+        <section className="mt-6 grid gap-6 md:grid-cols-2">
+          <div className="rounded-lg border border-white/10 bg-white p-6 text-slate-950">
+            <h2 className="text-xl font-bold">Previous audit</h2>
+            <p className="mt-1 text-sm text-slate-500">
+              Snapshot:{' '}
+              {data.oldPricing?.timestamp
+                ? new Date(data.oldPricing.timestamp).toLocaleString()
+                : 'stored pricing'}
+            </p>
+            <div className="mt-5 space-y-3">
+              {data.oldAudit.recommendations.map((rec: any) => (
+                <div key={rec.tool} className="rounded-lg border border-slate-200 bg-slate-50 p-4">
+                  <p className="font-semibold">{rec.tool}</p>
+                  <p className="mt-1 text-sm text-slate-600">
+                    {recommendationLabel(rec)} for {money(rec.savings)}/mo savings
                   </p>
-                )}
-              </div>
-            </div>
-
-            <div className="grid grid-cols-2 gap-4 mb-6">
-              <div className="bg-gray-50 rounded-lg p-4">
-                <p className="text-xs text-gray-500 mb-1">Monthly cost</p>
-                <p className="text-2xl font-bold text-gray-900">
-                  ${data.oldAudit.totalMonthlyCost}
-                </p>
-              </div>
-              <div className="bg-green-50 rounded-lg p-4">
-                <p className="text-xs text-gray-500 mb-1">Potential savings</p>
-                <p className="text-2xl font-bold text-green-600">
-                  ${data.oldAudit.totalPotentialSavings}
-                </p>
-              </div>
-            </div>
-
-            <h3 className="font-semibold text-gray-900 mb-3">Recommendations</h3>
-            <div className="space-y-3">
-              {data.oldAudit.recommendations.map((rec: any, idx: number) => (
-                <div key={idx} className="p-4 bg-gray-50 rounded-lg border border-gray-200">
-                  <p className="font-semibold text-gray-900">{rec.tool}</p>
-                  <p className="text-sm text-gray-600 mt-1">{rec.reason}</p>
-                  <p className="text-sm text-green-600 font-semibold mt-2">
-                    Save ${rec.savings}/month
-                  </p>
+                  <p className="mt-2 text-xs text-slate-500">{rec.reason}</p>
                 </div>
               ))}
               {data.oldAudit.recommendations.length === 0 && (
-                <p className="text-gray-400 italic text-sm">Already optimal at audit time</p>
+                <p className="text-sm text-slate-500">No recommendations in the original audit.</p>
               )}
             </div>
           </div>
 
-          {/* New Audit */}
-          <div className="bg-white rounded-lg shadow-xl p-6 md:p-8 border-4 border-purple-500">
-            <div className="flex items-center mb-6">
-              <span className="text-2xl mr-3">✨</span>
+          <div className="rounded-lg border-2 border-purple-500 bg-white p-6 text-slate-950">
+            <div className="flex items-center justify-between gap-3">
               <div>
-                <h2 className="text-xl md:text-2xl font-bold text-gray-900">Current Audit</h2>
-                {data.newPricing?.timestamp && (
-                  <p className="text-sm text-gray-400 mt-1">
-                    {new Date(data.newPricing.timestamp).toLocaleDateString()}
-                  </p>
-                )}
+                <h2 className="text-xl font-bold">Current audit</h2>
+                <p className="mt-1 text-sm text-slate-500">
+                  Snapshot:{' '}
+                  {data.newPricing?.timestamp
+                    ? new Date(data.newPricing.timestamp).toLocaleString()
+                    : 'current pricing'}
+                </p>
               </div>
-              <span className="ml-auto bg-purple-500 text-white px-3 py-1 rounded-full text-xs font-semibold">
+              <span className="rounded bg-purple-600 px-3 py-1 text-xs font-bold text-white">
                 UPDATED
               </span>
             </div>
-
-            <div className="grid grid-cols-2 gap-4 mb-6">
-              <div className="bg-gray-50 rounded-lg p-4">
-                <p className="text-xs text-gray-500 mb-1">Monthly cost</p>
-                <p className="text-2xl font-bold text-gray-900">
-                  ${data.newAudit.totalMonthlyCost}
-                  {costChange !== 0 && (
-                    <span
-                      className={`ml-1 text-sm font-normal ${
-                        costChange > 0 ? 'text-red-500' : 'text-green-500'
-                      }`}
-                    >
-                      {costChange > 0 ? '+' : ''}${costChange.toFixed(2)}
-                    </span>
-                  )}
-                </p>
-              </div>
-              <div className="bg-green-50 rounded-lg p-4">
-                <p className="text-xs text-gray-500 mb-1">Potential savings</p>
-                <p className="text-2xl font-bold text-green-600">
-                  ${data.newAudit.totalPotentialSavings}
-                  {savingsChange !== 0 && (
-                    <span
-                      className={`ml-1 text-sm font-normal ${
-                        savingsChange > 0 ? 'text-green-500' : 'text-orange-500'
-                      }`}
-                    >
-                      {savingsChange > 0 ? '+' : ''}${savingsChange.toFixed(2)}
-                    </span>
-                  )}
-                </p>
-              </div>
-            </div>
-
-            <h3 className="font-semibold text-gray-900 mb-3">Recommendations</h3>
-            <div className="space-y-3">
-              {data.newAudit.recommendations.map((rec: any, idx: number) => {
-                const changed = changedRecommendations.find((c) => c.tool === rec.tool);
-                const isNew = newRecommendations.find((r) => r.tool === rec.tool);
-
+            <div className="mt-5 space-y-3">
+              {data.newAudit.recommendations.map((rec: any) => {
+                const changed = changedRecommendations.some((change) => change.tool === rec.tool);
+                const isNew = newRecommendations.some((newRec) => newRec.tool === rec.tool);
                 return (
                   <div
-                    key={idx}
-                    className={`p-4 rounded-lg border-2 ${
+                    key={rec.tool}
+                    className={`rounded-lg border p-4 ${
                       isNew
-                        ? 'bg-green-50 border-green-400'
+                        ? 'border-emerald-300 bg-emerald-50'
                         : changed
-                        ? 'bg-yellow-50 border-yellow-400'
-                        : 'bg-gray-50 border-gray-200'
+                        ? 'border-amber-300 bg-amber-50'
+                        : 'border-slate-200 bg-slate-50'
                     }`}
                   >
-                    <div className="flex items-start justify-between gap-2">
-                      <p className="font-semibold text-gray-900">{rec.tool}</p>
+                    <div className="flex items-center justify-between gap-3">
+                      <p className="font-semibold">{rec.tool}</p>
                       {isNew && (
-                        <span className="bg-green-500 text-white px-2 py-0.5 rounded text-xs whitespace-nowrap">
+                        <span className="rounded bg-emerald-600 px-2 py-1 text-xs font-bold text-white">
                           NEW
                         </span>
                       )}
                       {changed && (
-                        <span className="bg-yellow-500 text-white px-2 py-0.5 rounded text-xs whitespace-nowrap">
-                          UPDATED
+                        <span className="rounded bg-amber-500 px-2 py-1 text-xs font-bold text-white">
+                          CHANGED
                         </span>
                       )}
                     </div>
-                    <p className="text-sm text-gray-600 mt-1">{rec.reason}</p>
-                    <p className="text-sm text-green-600 font-semibold mt-2">
-                      Save ${rec.savings}/month
-                      {changed && changed.oldRecommendation.savings !== rec.savings && (
-                        <span className="ml-2 text-gray-400 text-xs font-normal">
-                          (was ${changed.oldRecommendation.savings})
-                        </span>
-                      )}
+                    <p className="mt-1 text-sm text-slate-600">
+                      {recommendationLabel(rec)} for {money(rec.savings)}/mo savings
                     </p>
+                    <p className="mt-2 text-xs text-slate-500">{rec.reason}</p>
                   </div>
                 );
               })}
               {data.newAudit.recommendations.length === 0 && (
-                <p className="text-gray-400 italic text-sm">Now already optimal</p>
+                <p className="text-sm text-slate-500">No recommendations with current pricing.</p>
               )}
             </div>
           </div>
-        </div>
+        </section>
 
-        {/* What Changed summary */}
-        {hasChanges && (
-          <div className="bg-white rounded-lg shadow-xl p-6 md:p-8 mt-8">
-            <h2 className="text-xl md:text-2xl font-bold text-gray-900 mb-6">
-              📝 What Changed?
-            </h2>
+        <section className="mt-6 rounded-lg border border-white/10 bg-white p-6 text-slate-950">
+          <h2 className="text-xl font-bold">What changed and why</h2>
 
-            {changedRecommendations.length > 0 && (
-              <div className="mb-6">
-                <h3 className="font-semibold text-gray-700 mb-3 text-sm uppercase tracking-wide">
-                  Updated recommendations
-                </h3>
-                <div className="space-y-2">
-                  {changedRecommendations.map((change, idx) => (
-                    <div
-                      key={idx}
-                      className="p-4 bg-yellow-50 rounded-lg border border-yellow-200"
-                    >
-                      <p className="font-semibold text-gray-900">{change.tool}</p>
-                      <p className="text-sm text-gray-600 mt-1">
-                        Savings changed from{' '}
-                        <span className="font-mono">${change.oldRecommendation.savings}</span>
-                        {' → '}
-                        <span className="font-mono">${change.newRecommendation.savings}</span>
-                        <span
-                          className={`ml-2 font-semibold ${
-                            change.impact === 'better'
-                              ? 'text-green-600'
-                              : change.impact === 'worse'
-                              ? 'text-red-600'
-                              : 'text-gray-500'
-                          }`}
-                        >
-                          {change.impact === 'better' && '📈 Better'}
-                          {change.impact === 'worse' && '📉 Worse'}
-                          {change.impact === 'neutral' && '➡️ Neutral'}
+          {!hasRecommendationDiff && (
+            <p className="mt-4 rounded-lg bg-slate-50 p-4 text-sm text-slate-600">
+              The recommendation stayed the same. The pricing snapshot changed the monthly cost or
+              savings amount, but not the recommended plan.
+            </p>
+          )}
+
+          {changedRecommendations.length > 0 && (
+            <div className="mt-5 overflow-x-auto">
+              <table className="w-full min-w-[720px] border-collapse text-left text-sm">
+                <thead>
+                  <tr className="border-b border-slate-200 text-xs uppercase text-slate-500">
+                    <th className="py-3 pr-4">Tool</th>
+                    <th className="py-3 pr-4">Old recommendation</th>
+                    <th className="py-3 pr-4">New recommendation</th>
+                    <th className="py-3 pr-4">Why it changed</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {changedRecommendations.map((change) => (
+                    <tr key={change.tool} className="border-b border-slate-100">
+                      <td className="py-4 pr-4 font-semibold">{change.tool}</td>
+                      <td className="py-4 pr-4">
+                        {recommendationLabel(change.oldRecommendation)}
+                        <br />
+                        <span className="text-slate-500">
+                          {money(change.oldRecommendation.savings)}/mo savings
                         </span>
-                      </p>
-                    </div>
+                      </td>
+                      <td className="py-4 pr-4">
+                        {recommendationLabel(change.newRecommendation)}
+                        <br />
+                        <span className="font-semibold text-emerald-700">
+                          {money(change.newRecommendation.savings)}/mo savings
+                        </span>
+                      </td>
+                      <td className="py-4 pr-4 text-slate-600">{reasonText(change)}</td>
+                    </tr>
                   ))}
-                </div>
-              </div>
-            )}
+                </tbody>
+              </table>
+            </div>
+          )}
 
-            {newRecommendations.length > 0 && (
-              <div className="mb-6">
-                <h3 className="font-semibold text-gray-700 mb-3 text-sm uppercase tracking-wide">
-                  New recommendations
-                </h3>
-                <div className="space-y-2">
-                  {newRecommendations.map((rec, idx) => (
-                    <div
-                      key={idx}
-                      className="p-4 bg-green-50 rounded-lg border border-green-200"
-                    >
-                      <p className="font-semibold text-gray-900">{rec.tool}</p>
-                      <p className="text-sm text-gray-600 mt-1">{rec.reason}</p>
-                    </div>
-                  ))}
-                </div>
+          {newRecommendations.length > 0 && (
+            <div className="mt-6">
+              <h3 className="text-sm font-bold uppercase text-emerald-700">New recommendations</h3>
+              <div className="mt-3 space-y-3">
+                {newRecommendations.map((rec) => (
+                  <div key={rec.tool} className="rounded-lg border border-emerald-200 bg-emerald-50 p-4">
+                    <p className="font-semibold">{rec.tool}</p>
+                    <p className="mt-1 text-sm text-slate-600">
+                      New pricing now recommends {recommendationLabel(rec)} for{' '}
+                      {money(rec.savings)}/mo savings.
+                    </p>
+                    <p className="mt-2 text-xs text-slate-500">{rec.reason}</p>
+                  </div>
+                ))}
               </div>
-            )}
+            </div>
+          )}
 
-            {removedRecommendations.length > 0 && (
-              <div>
-                <h3 className="font-semibold text-gray-700 mb-3 text-sm uppercase tracking-wide">
-                  Removed recommendations
-                </h3>
-                <div className="space-y-2">
-                  {removedRecommendations.map((rec, idx) => (
-                    <div
-                      key={idx}
-                      className="p-4 bg-gray-50 rounded-lg border border-gray-200"
-                    >
-                      <p className="font-semibold text-gray-900">{rec.tool}</p>
-                      <p className="text-sm text-gray-400">No longer applicable at current pricing</p>
-                    </div>
-                  ))}
-                </div>
+          {removedRecommendations.length > 0 && (
+            <div className="mt-6">
+              <h3 className="text-sm font-bold uppercase text-slate-500">Removed recommendations</h3>
+              <div className="mt-3 space-y-3">
+                {removedRecommendations.map((rec) => (
+                  <div key={rec.tool} className="rounded-lg border border-slate-200 bg-slate-50 p-4">
+                    <p className="font-semibold">{rec.tool}</p>
+                    <p className="mt-1 text-sm text-slate-600">
+                      The old recommendation {recommendationLabel(rec)} is no longer triggered by
+                      current pricing.
+                    </p>
+                  </div>
+                ))}
               </div>
-            )}
-          </div>
-        )}
+            </div>
+          )}
 
-        {/* Footer CTA */}
+          {unchangedRecommendations.length > 0 && (
+            <details className="mt-6 rounded-lg bg-slate-50 p-4">
+              <summary className="cursor-pointer text-sm font-semibold text-slate-600">
+                Unchanged recommendations ({unchangedRecommendations.length})
+              </summary>
+              <div className="mt-3 space-y-2">
+                {unchangedRecommendations.map((rec: any) => (
+                  <p key={rec.tool} className="text-sm text-slate-500">
+                    {rec.tool}: {recommendationLabel(rec)} remains the recommendation.
+                  </p>
+                ))}
+              </div>
+            </details>
+          )}
+        </section>
+
         <div className="mt-8 text-center">
           <a
             href="/"
-            className="inline-block bg-white text-purple-700 font-semibold px-6 py-3 rounded-lg shadow hover:shadow-md transition-shadow"
+            className="inline-block rounded-lg bg-white px-6 py-3 text-sm font-bold text-purple-700 shadow"
           >
-            ← Run a fresh audit
+            Run a fresh audit
           </a>
         </div>
       </div>
-    </div>
+    </main>
   );
 }

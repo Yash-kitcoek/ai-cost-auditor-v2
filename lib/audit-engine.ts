@@ -3,11 +3,13 @@ import { PRICING_DATA, getPricingSnapshot } from './pricing';
 export interface AuditInput {
   email: string;
   tools: {
-    [key: string]: string; // tool key -> tier name
+    [key: string]: string;
   };
   usage?: {
     [key: string]: number;
   };
+  teamSize?: number;
+  useCase?: string;
 }
 
 export interface AuditRecommendation {
@@ -35,45 +37,40 @@ export function runAudit(input: AuditInput): AuditOutput {
     const tool = PRICING_DATA[toolKey];
     if (!tool) continue;
 
-    const currentTier = tool.tiers.find((t) => t.name === tierName);
+    // Fuzzy match — handles "Enterprise — $60/seat" matching "Enterprise"
+    const currentTier = tool.tiers.find(
+      (t) =>
+        t.name === tierName ||
+        tierName.toLowerCase().startsWith(t.name.toLowerCase()) ||
+        t.name.toLowerCase().startsWith(tierName.toLowerCase())
+    );
+
     if (!currentTier) continue;
 
-    totalMonthlyCost += currentTier.price;
+    // Use actual monthly spend from usage map if provided
+    const actualCost = input.usage?.[toolKey] || currentTier.price;
+    totalMonthlyCost += actualCost;
 
-    // Check for free tier
-    const freeTier = tool.tiers.find((t) => t.price === 0);
-    if (freeTier && currentTier.price > 0) {
-      const savings = currentTier.price;
-      recommendations.push({
-        tool: tool.name,
-        currentTier: currentTier.name,
-        currentCost: currentTier.price,
-        recommendedTier: freeTier.name,
-        recommendedCost: freeTier.price,
-        savings,
-        reason: `Consider if ${tool.name} free tier meets your needs - save $${savings}/mo`,
-      });
-      totalPotentialSavings += savings;
-    }
+    // Find cheapest tier below current
+    const cheaperTiers = tool.tiers.filter((t) => t.price < currentTier.price);
+    if (cheaperTiers.length === 0) continue;
 
-    // Check for cheaper paid tiers
-    const cheaperTiers = tool.tiers.filter(
-      (t) => t.price < currentTier.price && t.price > 0
-    );
-    if (cheaperTiers.length > 0 && !freeTier) {
-      const cheapest = cheaperTiers[cheaperTiers.length - 1];
-      const savings = currentTier.price - cheapest.price;
-      recommendations.push({
-        tool: tool.name,
-        currentTier: currentTier.name,
-        currentCost: currentTier.price,
-        recommendedTier: cheapest.name,
-        recommendedCost: cheapest.price,
-        savings,
-        reason: `Downgrade to ${cheapest.name} tier - save $${savings}/mo`,
-      });
-      totalPotentialSavings += savings;
-    }
+    const cheapest = cheaperTiers.reduce((a, b) => (a.price < b.price ? a : b));
+    const savings = actualCost - cheapest.price;
+
+    if (savings <= 0) continue;
+
+    recommendations.push({
+      tool: tool.name,
+      currentTier: currentTier.name,
+      currentCost: actualCost,
+      recommendedTier: cheapest.name,
+      recommendedCost: cheapest.price,
+      savings,
+      reason: `Downgrade from ${currentTier.name} to ${cheapest.name} — save $${savings}/mo`,
+    });
+
+    totalPotentialSavings += savings;
   }
 
   return {

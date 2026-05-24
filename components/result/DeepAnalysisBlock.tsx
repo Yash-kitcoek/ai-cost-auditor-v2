@@ -176,7 +176,7 @@ export default function DeepAnalysisBlock({ result, input }: Props) {
       }
     }
     fetchAnalysis();
-  }, []);
+  }, [input, result]);
 
   return (
     <div style={{ marginBottom: 16 }}>
